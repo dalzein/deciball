@@ -1,0 +1,55 @@
+.uploader {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  height: 11rem;
+  width: 11rem;
+  margin: auto;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+h2,
+h3 {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+h2 {
+  margin-bottom: 0.5rem;
+}
+
+input {
+  display: none;
+}
+
+label {
+  font-weight: 400;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  color: #000;
+  content: "Hello";
+  cursor: pointer;
+  padding: 0 0.75em;
+  border: none;
+  height: 2.125rem;
+  border-radius: 2.125rem;
+  transition: all 0.2s linear;
+}
+
+label:hover {
+  background-color: pink;
+}
+
+#file-chosen {
+  display: none;
+}

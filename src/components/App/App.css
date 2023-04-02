@@ -1,0 +1,11 @@
+header {
+  position: absolute;
+  padding: 1rem;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+h1 {
+  font-family: "Leckerli One", cursive;
+}
