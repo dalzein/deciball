@@ -7,7 +7,7 @@ function Visualiser() {
   const [{ audioContext, analyser, frequencyArray }, setAudioData] = useState({
     audioContext: null,
     analyser: null,
-    frequencyArray: null,
+    frequencyArray: new Uint8Array(4096),
   });
   const canvasRef = useRef(null);
   const audioRef = useRef(null);
@@ -18,6 +18,7 @@ function Visualiser() {
     if (!audioSource) {
       // Create audio context
       const audioElement = audioRef.current;
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
       const newAudioContext = new AudioContext();
       audioSource = newAudioContext.createMediaElementSource(audioElement);
 
@@ -141,7 +142,7 @@ function Visualiser() {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
-      analyser.getByteFrequencyData(frequencyArray);
+      analyser && analyser.getByteFrequencyData(frequencyArray);
 
       // Iterate through the coordinates making up the left half of the rings
       // The right half will just be a mirror of the left half
@@ -252,7 +253,7 @@ function Visualiser() {
       canvas.height = window.innerHeight;
       radius = Math.min(canvas.width / 3, 150);
 
-      frequencyArray && updateCoordinates();
+      updateCoordinates();
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -270,7 +271,7 @@ function Visualiser() {
   }, [analyser, frequencyArray]);
 
   function handlePlay() {
-    audioContext.resume();
+    audioContext.state === "suspended" && audioContext.resume();
   }
 
   return (
