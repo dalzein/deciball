@@ -22,6 +22,7 @@ h2 {
 }
 
 h3 {
+  color: var(--foreground-secondary);
   font-size: 0.85rem;
   font-weight: 400;
 }
