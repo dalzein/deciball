@@ -2,24 +2,24 @@ import React, { useEffect, useRef, useState } from "react";
 import Playback from "../Uploader/Uploader";
 import "./Visualiser.css";
 
-let audioSource = null;
 function Visualiser() {
   const [{ audioContext, analyser, frequencyArray }, setAudioData] = useState({
     audioContext: null,
     analyser: null,
-    frequencyArray: null,
+    frequencyArray: new Uint8Array(2048),
   });
   const canvasRef = useRef(null);
   const audioRef = useRef(null);
   const totalRingPoints = 32;
 
   // Set up audio context
-  useEffect(() => {
-    if (!audioSource) {
-      // Create audio context
+  function setUpAudioContext() {
+    // Create audio context
+    if (!audioContext) {
       const audioElement = audioRef.current;
       const newAudioContext = new AudioContext();
-      audioSource = newAudioContext.createMediaElementSource(audioElement);
+      const audioSource =
+        newAudioContext.createMediaElementSource(audioElement);
 
       // Create analyser
       const newAnalyser = newAudioContext.createAnalyser();
@@ -28,13 +28,15 @@ function Visualiser() {
       audioSource.connect(newAnalyser);
       newAnalyser.connect(newAudioContext.destination);
 
+      newAudioContext.resume();
+
       setAudioData({
         audioContext: newAudioContext,
         analyser: newAnalyser,
         frequencyArray: newFrequencyArray,
       });
     }
-  }, []);
+  }
 
   // Set up canvas visualiser
   useEffect(() => {
@@ -141,7 +143,7 @@ function Visualiser() {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
-      analyser.getByteFrequencyData(frequencyArray);
+      analyser && analyser.getByteFrequencyData(frequencyArray);
 
       // Iterate through the coordinates making up the left half of the rings
       // The right half will just be a mirror of the left half
@@ -269,10 +271,6 @@ function Visualiser() {
     draw();
   }, [analyser, frequencyArray]);
 
-  function handlePlay() {
-    audioContext.resume();
-  }
-
   return (
     <>
       <canvas
@@ -282,7 +280,7 @@ function Visualiser() {
       ></canvas>
       <Playback audioRef={audioRef} />
       <div className="audio-wrapper">
-        <audio ref={audioRef} controls onPlay={handlePlay}></audio>
+        <audio ref={audioRef} controls onPlay={setUpAudioContext}></audio>
       </div>
     </>
   );
