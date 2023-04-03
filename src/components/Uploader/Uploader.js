@@ -13,7 +13,7 @@ function Uploader({ audioRef }) {
           setTrackInfo({ title: tag.tags.title, artist: tag.tags.artist });
         },
         onError: function (error) {
-          console.log(error);
+          setTrackInfo({ title: "Unknown", artist: "" });
         },
       });
     }
@@ -32,7 +32,7 @@ function Uploader({ audioRef }) {
         onChange={handleChange}
       ></input>
       <label htmlFor="file">
-        <span>Choose file</span>
+        <span>{title || artist ? "Change" : "Choose"} file</span>
       </label>
     </div>
   );

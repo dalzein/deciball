@@ -31,12 +31,12 @@ input {
 }
 
 label {
-  font-weight: 400;
-  font-size: 1rem;
+  font-weight: 700;
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
-  background-color: var(--foreground);
-  color: #000;
+  background-color: pink;
+  color: var(--background);
   content: "Hello";
   cursor: pointer;
   padding: 0 0.75em;
@@ -47,7 +47,7 @@ label {
 }
 
 label:hover {
-  background-color: pink;
+  background-color: var(--foreground);
 }
 
 #file-chosen {
