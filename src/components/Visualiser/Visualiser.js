@@ -48,7 +48,7 @@ function Visualiser() {
     let currentLoudness = 0;
 
     // Set up the empty 2d particle array for the flying particles
-    for (let angle = 0; angle < 360; angle += 3) {
+    for (let angle = 0; angle < 360; angle += 1) {
       particleCoordinates.push({
         particleCoordinateArray: [],
         angle: angle,
@@ -134,23 +134,6 @@ function Visualiser() {
       ctx.fillStyle = "#000";
       ctx.stroke();
       ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = ctx.createPattern(createPatternImage(), "repeat");
-      ctx.fill();
-
-      // Create dot to be used as repeated background
-      function createPatternImage() {
-        var tempCtx = document.createElement("canvas").getContext("2d");
-        tempCtx.canvas.width = tempCtx.canvas.height = 8;
-        tempCtx.beginPath();
-        tempCtx.arc(4, 4, 2, 0, 2 * Math.PI);
-        tempCtx.shadowBlur = 0;
-        tempCtx.lineWidth = 0;
-        tempCtx.fillStyle = "#333";
-        tempCtx.fill();
-        tempCtx.stroke();
-        return tempCtx.canvas;
-      }
     }
 
     // Update the coordinates of the rings and particles
@@ -223,22 +206,29 @@ function Visualiser() {
     function updateParticleCoordinates(centerX, centerY, radius) {
       particleCoordinates.forEach((position) => {
         // As the loudness increases, the chance of a particle being generated should increase
-        if (Math.pow(currentLoudness, 2) > Math.random() * 50) {
+        if (Math.pow(currentLoudness, 5) > Math.random() * 50) {
           position.particleCoordinateArray.push({
             x: centerX + Math.sin((position.angle * Math.PI) / 180) * radius,
             y: centerY + Math.cos((position.angle * Math.PI) / 180) * radius,
-            size: Math.random() * 3,
-            opacity: Math.random(),
+            size: Math.pow(Math.random(), 2) * 3,
+            opacity: Math.pow(Math.random(), 2),
+            angle: position.angle,
           });
         }
 
         // Update the x and y coordinates for the particle
         position.particleCoordinateArray.forEach((particle, index) => {
-          particle.speed = Math.pow(currentLoudness, 5) + 0.5;
+          const angleChange = Math.random() < 0.5 ? -5 : 5;
+          particle.angle =
+            particle.angle + angleChange < position.angle - 60 ||
+            particle.angle + angleChange > position.angle + 60
+              ? particle.angle
+              : particle.angle + angleChange;
+          particle.speed = Math.pow(currentLoudness, 10) + 0.5;
           particle.x +=
-            Math.sin((position.angle * Math.PI) / 180) * particle.speed;
+            Math.sin((particle.angle * Math.PI) / 180) * particle.speed;
           particle.y +=
-            Math.cos((position.angle * Math.PI) / 180) * particle.speed;
+            Math.cos((particle.angle * Math.PI) / 180) * particle.speed;
 
           // If the particle has left the screen, remove it from the array as we no longer need to track it
           if (

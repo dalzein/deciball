@@ -18,7 +18,7 @@ html {
 
 body {
   color: var(--foreground);
-  font-family: "Roboto", sans-serif;
+  font-family: "Ubuntu", sans-serif;
   background: radial-gradient(
       farthest-side at bottom left,
       var(--blue),

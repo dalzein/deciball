@@ -16,14 +16,14 @@
   text-align: center;
 }
 
-h2,
-h3 {
-  font-weight: 700;
-  font-size: 0.85rem;
+h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
 }
 
-h2 {
-  margin-bottom: 0.5rem;
+h3 {
+  font-size: 0.85rem;
+  font-weight: 400;
 }
 
 input {
@@ -32,10 +32,10 @@ input {
 
 label {
   font-weight: 400;
-  font-size: 0.85rem;
+  font-size: 1rem;
   display: flex;
   align-items: center;
-  background-color: #fff;
+  background-color: var(--foreground);
   color: #000;
   content: "Hello";
   cursor: pointer;
