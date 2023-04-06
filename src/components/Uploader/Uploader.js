@@ -10,7 +10,11 @@ function Uploader({ audioRef }) {
 
       window.jsmediatags.read(e.target.files[0], {
         onSuccess: function (tag) {
-          setTrackInfo({ title: tag.tags.title, artist: tag.tags.artist });
+          if (tag.tags.title) {
+            setTrackInfo({ title: tag.tags.title, artist: tag.tags.artist });
+          } else {
+            setTrackInfo({ title: "Unknown", artist: "" });
+          }
         },
         onError: function (error) {
           setTrackInfo({ title: "Unknown", artist: "" });

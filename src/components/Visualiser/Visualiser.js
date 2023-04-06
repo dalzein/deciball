@@ -37,6 +37,20 @@ function Visualiser() {
     }
   }, []);
 
+  // User interaction is needed before we can resume the audio context
+  useEffect(() => {
+    function resumeAudioContext() {
+      audioContext?.state === "suspended" && audioContext.resume();
+    }
+
+    document.addEventListener("touchend", resumeAudioContext);
+    document.addEventListener("click", resumeAudioContext);
+    return () => {
+      document.removeEventListener("touchend", resumeAudioContext);
+      document.removeEventListener("click", resumeAudioContext);
+    };
+  }, [audioContext]);
+
   // Set up canvas visualiser
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -270,10 +284,6 @@ function Visualiser() {
     draw();
   }, [analyser, frequencyArray]);
 
-  function handlePlay() {
-    audioContext.state === "suspended" && audioContext.resume();
-  }
-
   return (
     <>
       <canvas
@@ -283,7 +293,7 @@ function Visualiser() {
       ></canvas>
       <Playback audioRef={audioRef} />
       <div className="audio-wrapper">
-        <audio ref={audioRef} controls onPlay={handlePlay}></audio>
+        <audio ref={audioRef} controls></audio>
       </div>
     </>
   );
