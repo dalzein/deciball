@@ -8,15 +8,17 @@ function Uploader({ audioRef }) {
     if (e.target.files[0]) {
       audioRef.current.src = URL.createObjectURL(e.target.files[0]);
 
+      // Try to read the file tags and and set the track title and artist
       window.jsmediatags.read(e.target.files[0], {
-        onSuccess: function (tag) {
+        onSuccess: (tag) => {
           if (tag.tags.title) {
             setTrackInfo({ title: tag.tags.title, artist: tag.tags.artist });
           } else {
-            setTrackInfo({ title: "Unknown", artist: "" });
+            setTrackInfo({ title: "Unknown", artist: tag.tags.artist });
           }
         },
-        onError: function (error) {
+        onError: (error) => {
+          console.log(error);
           setTrackInfo({ title: "Unknown", artist: "" });
         },
       });

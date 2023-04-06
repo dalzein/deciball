@@ -45,6 +45,7 @@ function Visualiser() {
 
     document.addEventListener("touchend", resumeAudioContext);
     document.addEventListener("click", resumeAudioContext);
+
     return () => {
       document.removeEventListener("touchend", resumeAudioContext);
       document.removeEventListener("click", resumeAudioContext);
@@ -55,11 +56,11 @@ function Visualiser() {
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    let radius = Math.min(canvas.width / 3, 150);
     const ringCoordinates = [];
     const secondaryRingCoordinates = [];
     const particleCoordinates = [];
 
+    let radius = Math.min(canvas.width / 3, 150);
     let currentLoudness = 0;
 
     // Set up the empty 2d particle array for the flying particles
@@ -272,7 +273,6 @@ function Visualiser() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       renderParticles();
-
       renderRing(
         secondaryRingCoordinates,
         `hsl(${360 * Math.pow(currentLoudness, 2) + 200}, 100%, 50%)`
