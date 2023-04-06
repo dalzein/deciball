@@ -4,14 +4,14 @@ import "./Visualiser.css";
 
 let audioSource = null;
 function Visualiser() {
+  const canvasRef = useRef(null);
+  const audioRef = useRef(null);
+  const totalRingPoints = 64;
   const [{ audioContext, analyser, frequencyArray }, setAudioData] = useState({
     audioContext: null,
     analyser: null,
-    frequencyArray: new Uint8Array(4096),
+    frequencyArray: new Float32Array(totalRingPoints / 2 + 1),
   });
-  const canvasRef = useRef(null);
-  const audioRef = useRef(null);
-  const totalRingPoints = 32;
 
   // Set up audio context
   useEffect(() => {
@@ -25,15 +25,14 @@ function Visualiser() {
       // Create analyser
       const newAnalyser = newAudioContext.createAnalyser();
       newAnalyser.fftSize = 8192;
-      const newFrequencyArray = new Uint8Array(newAnalyser.frequencyBinCount);
       audioSource.connect(newAnalyser);
       newAnalyser.connect(newAudioContext.destination);
 
-      setAudioData({
+      setAudioData((previousValue) => ({
+        ...previousValue,
         audioContext: newAudioContext,
         analyser: newAnalyser,
-        frequencyArray: newFrequencyArray,
-      });
+      }));
     }
   }, []);
 
@@ -98,17 +97,9 @@ function Visualiser() {
     }
 
     // Render the ring based on coordinates provided
-    function renderRing(coordinateArray, fillColour, outline = false) {
-      if (outline) {
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = "rgba(255, 255, 255, 1)";
-        ctx.lineWidth = 0;
-        ctx.strokeStyle = "#fff";
-      } else {
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = fillColour;
-        ctx.strokeStyle = "transparent";
-      }
+    function renderRing(coordinateArray, fillColour) {
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = fillColour;
       ctx.fillStyle = fillColour;
       ctx.beginPath();
       ctx.moveTo(coordinateArray[0].x, coordinateArray[0].y);
@@ -129,7 +120,6 @@ function Visualiser() {
         coordinateArray[0].y
       );
       ctx.closePath();
-      ctx.stroke();
       ctx.fill();
     }
 
@@ -157,18 +147,15 @@ function Visualiser() {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
-      analyser && analyser.getByteFrequencyData(frequencyArray);
+      analyser && analyser.getFloatFrequencyData(frequencyArray);
 
-      // Iterate through the coordinates making up the left half of the rings
-      // The right half will just be a mirror of the left half
+      // Loop through and calculate the left half of the ring coordinates - the right half will mirror the left
       for (let i = 0; i <= totalRingPoints / 2; i++) {
-        const audioValue = frequencyArray[i * 2] / 255;
-
-        const baseDistanceFactor = 1 + Math.pow(audioValue, 2);
+        const audioValue = -1 / frequencyArray[i];
 
         ringCoordinates[i].distanceFactor = Math.max(
           1,
-          0.8 * baseDistanceFactor
+          0.75 * (1 + 30 * audioValue)
         );
         ringCoordinates[i].x =
           centerX +
@@ -183,7 +170,7 @@ function Visualiser() {
 
         secondaryRingCoordinates[i].distanceFactor = Math.max(
           1,
-          0.85 * (1 + Math.pow(audioValue, 3))
+          0.6 * (1 + 50 * audioValue)
         );
         secondaryRingCoordinates[i].x =
           centerX +
@@ -196,7 +183,6 @@ function Visualiser() {
             Math.sin((-secondaryRingCoordinates[i].angle * Math.PI) / 180) *
             secondaryRingCoordinates[i].distanceFactor;
 
-        // Right half ring coordinates are just a mirror of the left
         if (i > 0) {
           ringCoordinates[totalRingPoints - i].x =
             2 * centerX - ringCoordinates[i].x;
@@ -222,7 +208,7 @@ function Visualiser() {
     function updateParticleCoordinates(centerX, centerY, radius) {
       particleCoordinates.forEach((position) => {
         // As the loudness increases, the chance of a particle being generated should increase
-        if (Math.pow(currentLoudness, 5) > Math.random() * 50) {
+        if (Math.pow(currentLoudness, 8) > Math.random() * 40) {
           position.particleCoordinateArray.push({
             x: centerX + Math.sin((position.angle * Math.PI) / 180) * radius,
             y: centerY + Math.cos((position.angle * Math.PI) / 180) * radius,
@@ -240,7 +226,7 @@ function Visualiser() {
             particle.angle + angleChange > position.angle + 60
               ? particle.angle
               : particle.angle + angleChange;
-          particle.speed = Math.pow(currentLoudness, 10) + 0.5;
+          particle.speed = Math.pow(currentLoudness, 12) + 0.1;
           particle.x +=
             Math.sin((particle.angle * Math.PI) / 180) * particle.speed;
           particle.y +=
@@ -263,7 +249,6 @@ function Visualiser() {
       requestAnimationFrame(draw);
 
       // Resize the canvas in case the browser window has been resized
-      // This is a cleaner way of doing it as we don't need to listen for the resize event or interrupt the animation
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       radius = Math.min(canvas.width / 3, 150);
@@ -277,7 +262,7 @@ function Visualiser() {
         secondaryRingCoordinates,
         `hsl(${360 * Math.pow(currentLoudness, 2) + 200}, 100%, 50%)`
       );
-      renderRing(ringCoordinates, "#fff", true);
+      renderRing(ringCoordinates, "#fff");
       renderCircle();
     }
 
