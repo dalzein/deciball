@@ -6,11 +6,11 @@ let audioSource = null;
 function Visualiser() {
   const canvasRef = useRef(null);
   const audioRef = useRef(null);
-  const totalRingPoints = 64;
+  const totalRingPoints = 48;
   const [{ audioContext, analyser, frequencyArray }, setAudioData] = useState({
     audioContext: null,
     analyser: null,
-    frequencyArray: new Float32Array(totalRingPoints / 2 + 1),
+    frequencyArray: new Float32Array(totalRingPoints),
   });
 
   // Set up audio context
@@ -19,7 +19,7 @@ function Visualiser() {
       // Create audio context
       const audioElement = audioRef.current;
       const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const newAudioContext = new AudioContext();
+      const newAudioContext = new AudioContext({ sampleRate: 44100 });
       audioSource = newAudioContext.createMediaElementSource(audioElement);
 
       // Create analyser
@@ -71,7 +71,7 @@ function Visualiser() {
     }
 
     // Initialise ring points
-    for (let angle = 270; angle > -90; angle -= 360 / totalRingPoints) {
+    for (let angle = 90; angle < 450; angle += 360 / totalRingPoints) {
       const pointData = JSON.stringify({
         angle: angle,
         x: (canvas.width / 2) * Math.cos((-angle * Math.PI) / 180),
@@ -151,7 +151,8 @@ function Visualiser() {
 
       // Loop through and calculate the left half of the ring coordinates - the right half will mirror the left
       for (let i = 0; i <= totalRingPoints / 2; i++) {
-        const audioValue = -1 / frequencyArray[i];
+        // Get the sample from the frequency array, skip the first few bins (15-20hz)
+        const audioValue = -1 / frequencyArray[i + 3];
 
         ringCoordinates[i].distanceFactor = Math.max(
           1,
@@ -170,7 +171,7 @@ function Visualiser() {
 
         secondaryRingCoordinates[i].distanceFactor = Math.max(
           1,
-          0.6 * (1 + 50 * audioValue)
+          0.6 * (1 + 45 * audioValue)
         );
         secondaryRingCoordinates[i].x =
           centerX +
