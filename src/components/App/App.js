@@ -212,7 +212,7 @@ function App() {
     function updateParticleCoordinates(centerX, centerY, radius) {
       particleCoordinates.forEach((position) => {
         // As the loudness increases, the chance of a particle being generated should increase
-        if (Math.pow(currentLoudness, 10) > Math.random() * 40) {
+        if (Math.pow(currentLoudness, 12) > Math.random() * 30) {
           position.particleCoordinateArray.push({
             x: centerX + Math.sin((position.angle * Math.PI) / 180) * radius,
             y: centerY + Math.cos((position.angle * Math.PI) / 180) * radius,
@@ -230,7 +230,7 @@ function App() {
             particle.angle + angleChange > position.angle + 60
               ? particle.angle
               : particle.angle + angleChange;
-          particle.speed = Math.pow(currentLoudness, 12) + 0.1;
+          particle.speed = Math.pow(currentLoudness, 15) + 0.1;
           particle.x +=
             Math.sin((particle.angle * Math.PI) / 180) * particle.speed;
           particle.y +=
