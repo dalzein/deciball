@@ -1,29 +1,28 @@
 .uploader {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   gap: 2rem;
-  height: 11rem;
-  width: 11rem;
+  height: calc(min(100vw, 100vh) / 3.5);
+  width: calc(min(100vw, 100vh) / 3.5);
   margin: auto;
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  padding: 0.5rem;
   text-align: center;
 }
 
 h2 {
-  font-size: 1rem;
+  font-size: calc(min(min(100vw, 100vh) / 40, 1rem));
   margin-bottom: 0.5rem;
 }
 
 h3 {
   color: var(--foreground-secondary);
-  font-size: 0.85rem;
+  font-size: calc(min(min(100vw, 100vh) / 45, 0.85rem));
   font-weight: 400;
 }
 
@@ -33,9 +32,10 @@ input {
 
 label {
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: calc(min(min(100vw, 100vh) / 30, 1rem));
   display: flex;
   align-items: center;
+  justify-content: center;
   background-color: pink;
   color: var(--background);
   content: "Hello";
@@ -49,6 +49,33 @@ label {
 
 label:hover {
   background-color: var(--foreground);
+}
+
+label > i {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .uploader {
+    gap: 1rem;
+  }
+
+  h2 {
+    margin-bottom: 0.2rem;
+  }
+
+  label {
+    width: calc(min(min(100vw, 100vh) / 10, 2.5rem));
+    height: calc(min(min(100vw, 100vh) / 10, 2.5rem));
+  }
+
+  label > span {
+    display: none;
+  }
+
+  label > i {
+    display: inherit !important;
+  }
 }
 
 #file-chosen {

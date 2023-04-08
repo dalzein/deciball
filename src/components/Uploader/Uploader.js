@@ -27,10 +27,12 @@ function Uploader({ audioRef }) {
 
   return (
     <div className="uploader">
-      <div className="track-info">
-        <h2 className="title">{title}</h2>
-        <h3 className="artist">{artist}</h3>
-      </div>
+      {title && (
+        <div className="track-info">
+          <h2 className="title">{title}</h2>
+          <h3 className="artist">{artist}</h3>
+        </div>
+      )}
       <input
         id="file"
         type="file"
@@ -39,6 +41,7 @@ function Uploader({ audioRef }) {
       ></input>
       <label htmlFor="file">
         <span>{title || artist ? "Change" : "Choose"} file</span>
+        <i class="fa-solid fa-upload"></i>
       </label>
     </div>
   );

@@ -59,7 +59,7 @@ function Visualiser() {
     const secondaryRingCoordinates = [];
     const particleCoordinates = [];
 
-    let radius = Math.min(canvas.width / 3, 150);
+    let radius = Math.min(canvas.width, canvas.height) / 4;
     let currentLoudness = 0;
 
     // Set up the empty 2d particle array for the flying particles
@@ -252,7 +252,7 @@ function Visualiser() {
       // Resize the canvas in case the browser window has been resized
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      radius = Math.min(canvas.width / 3, 150);
+      radius = Math.min(canvas.width, canvas.height) / 4;
 
       updateCoordinates();
 
