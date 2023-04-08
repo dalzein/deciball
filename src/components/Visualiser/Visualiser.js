@@ -213,8 +213,8 @@ function Visualiser() {
           position.particleCoordinateArray.push({
             x: centerX + Math.sin((position.angle * Math.PI) / 180) * radius,
             y: centerY + Math.cos((position.angle * Math.PI) / 180) * radius,
-            size: Math.pow(Math.random(), 2) * (radius / 50),
-            opacity: Math.pow(Math.random(), 2),
+            size: Math.pow(Math.random(), 3) * (radius / 50),
+            opacity: Math.pow(Math.random(), 3),
             angle: position.angle,
           });
         }
