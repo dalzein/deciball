@@ -1,28 +1,24 @@
 .uploader {
   display: flex;
-  flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 2rem;
-  height: calc(min(100vw, 100vh) / 3.5);
-  width: calc(min(100vw, 100vh) / 3.5);
-  margin: auto;
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
+  gap: 1rem;
   text-align: center;
 }
 
-h2 {
-  font-size: calc(min(min(100vw, 100vh) / 40, 1rem));
-  margin-bottom: 0.5rem;
+.track-info {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  opacity: 0.5;
 }
 
-h3 {
-  color: var(--foreground-secondary);
-  font-size: calc(min(min(100vw, 100vh) / 45, 0.85rem));
+span {
+  font-size: 1rem;
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 400;
 }
 
@@ -31,53 +27,36 @@ input {
 }
 
 label {
-  font-weight: 700;
-  font-size: calc(min(min(100vw, 100vh) / 30, 1rem));
+  font-size: 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: pink;
+  background-color: var(--foreground);
   color: var(--background);
   content: "Hello";
   cursor: pointer;
-  padding: 0 0.75em;
+  padding: 0 1rem;
   border: none;
-  height: 2.125rem;
-  border-radius: 2.125rem;
+  height: 2.25rem;
+  border-radius: 2.25rem;
   transition: all 0.2s linear;
+  opacity: 0.5;
 }
 
 label:hover {
-  background-color: var(--foreground);
+  opacity: 1;
 }
 
 label > i {
   display: none !important;
 }
 
-@media (max-width: 768px) {
-  .uploader {
-    gap: 1rem;
-  }
-
-  h2 {
-    margin-bottom: 0.2rem;
-  }
-
-  label {
-    width: calc(min(min(100vw, 100vh) / 10, 2.5rem));
-    height: calc(min(min(100vw, 100vh) / 10, 2.5rem));
-  }
-
-  label > span {
-    display: none;
-  }
-
-  label > i {
-    display: inherit !important;
-  }
-}
-
 #file-chosen {
   display: none;
+}
+
+@media (max-width: 768px) {
+  .uploader {
+    gap: 0.5rem;
+  }
 }

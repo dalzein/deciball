@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import "./Uploader.css";
 
 function Uploader({ audioRef }) {
-  const [{ title, artist }, setTrackInfo] = useState({ title: "", artist: "" });
+  const [{ title }, setTrackInfo] = useState({ title: "" });
 
   function handleChange(e) {
     if (e.target.files[0]) {
@@ -12,9 +12,11 @@ function Uploader({ audioRef }) {
       window.jsmediatags.read(e.target.files[0], {
         onSuccess: (tag) => {
           if (tag.tags.title) {
-            setTrackInfo({ title: tag.tags.title, artist: tag.tags.artist });
+            setTrackInfo({ title: tag.tags.title });
           } else {
-            setTrackInfo({ title: "Unknown", artist: tag.tags.artist });
+            setTrackInfo({
+              title: e.target.files[0].name,
+            });
           }
         },
         onError: (error) => {
@@ -27,12 +29,6 @@ function Uploader({ audioRef }) {
 
   return (
     <div className="uploader">
-      {title && (
-        <div className="track-info">
-          <h2 className="title">{title}</h2>
-          <h3 className="artist">{artist}</h3>
-        </div>
-      )}
       <input
         id="file"
         type="file"
@@ -40,9 +36,13 @@ function Uploader({ audioRef }) {
         onChange={handleChange}
       ></input>
       <label htmlFor="file">
-        <span>{title || artist ? "Change" : "Choose"} file</span>
-        <i class="fa-solid fa-upload"></i>
+        <span>{title ? "Change" : "Choose"} file</span>
       </label>
+      {title && (
+        <div className="track-info">
+          <span className="title">{title}</span>
+        </div>
+      )}
     </div>
   );
 }

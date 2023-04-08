@@ -1,11 +1,50 @@
-header {
+canvas {
   position: absolute;
-  padding: 1rem;
+  width: 100%;
+  height: 100%;
+}
+
+.audio-wrapper {
+  position: absolute;
+  bottom: 1rem;
   width: 100%;
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 1rem;
 }
 
-h1 {
-  font-family: "Pacifico", cursive;
+audio {
+  opacity: 0.5;
+  transition: opacity 0.2s linear;
+  width: min(25rem, 90vw);
+}
+
+audio:hover {
+  opacity: 1;
+}
+
+.logo-wrapper {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.logo {
+  position: absolute;
+  height: calc(min(100vw, 100vh) / 3.5);
+  width: calc(min(100vw, 100vh) / 3.5);
+  background-image: url("logo.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+@media (max-width: 768px) {
+  .audio-wrapper {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }

@@ -19,7 +19,7 @@ html {
 
 body {
   color: var(--foreground);
-  font-family: "Ubuntu", sans-serif;
+  font-family: "Roboto", sans-serif;
   background: radial-gradient(
       farthest-side at bottom left,
       var(--blue),
