@@ -209,7 +209,7 @@ function Visualiser() {
     function updateParticleCoordinates(centerX, centerY, radius) {
       particleCoordinates.forEach((position) => {
         // As the loudness increases, the chance of a particle being generated should increase
-        if (Math.pow(currentLoudness, 8) > Math.random() * 40) {
+        if (Math.pow(currentLoudness, 10) > Math.random() * 50) {
           position.particleCoordinateArray.push({
             x: centerX + Math.sin((position.angle * Math.PI) / 180) * radius,
             y: centerY + Math.cos((position.angle * Math.PI) / 180) * radius,
