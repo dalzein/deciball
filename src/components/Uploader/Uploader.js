@@ -21,7 +21,7 @@ function Uploader({ audioRef }) {
         },
         onError: (error) => {
           console.log(error);
-          setTrackInfo({ title: "Unknown", artist: "" });
+          setTrackInfo({ title: e.target.files[0].name });
         },
       });
     }
