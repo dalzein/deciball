@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import "./Uploader.css";
 
 function Uploader({ audioRef }) {
-  const [{ title }, setTrackInfo] = useState({ title: "" });
+  const [{ title }, setTrackInfo] = useState({ title: "Octilary" });
 
   function handleChange(e) {
     if (e.target.files[0]) {
@@ -32,7 +32,7 @@ function Uploader({ audioRef }) {
       <input
         id="file"
         type="file"
-        accept=".mp3,audio/*"
+        accept="audio/*"
         onChange={handleChange}
       ></input>
       <label htmlFor="file">

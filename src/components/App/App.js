@@ -99,7 +99,7 @@ function App() {
 
     // Render the ring based on coordinates provided
     function renderRing(coordinateArray, fillColour) {
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = (radius * currentLoudness) / 6;
       ctx.shadowColor = fillColour;
       ctx.fillStyle = fillColour;
       ctx.beginPath();
@@ -135,7 +135,7 @@ function App() {
         2 * Math.PI
       );
       ctx.strokeStyle = "#fff";
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = (radius * currentLoudness) / 6;
       ctx.shadowColor = "#fff";
       ctx.lineWidth = radius / 5;
       ctx.fillStyle = "#000";
@@ -207,17 +207,16 @@ function App() {
 
       updateParticleCoordinates(centerX, centerY, radius);
     }
-    console.log(radius / 50);
     // Updates the coordinates of the flying particles
     function updateParticleCoordinates(centerX, centerY, radius) {
       particleCoordinates.forEach((position) => {
         // As the loudness increases, the chance of a particle being generated should increase
-        if (Math.pow(currentLoudness, 12) > Math.random() * 30) {
+        if (Math.pow(currentLoudness, 12) > Math.random() * 20) {
           position.particleCoordinateArray.push({
             x: centerX + Math.sin((position.angle * Math.PI) / 180) * radius,
             y: centerY + Math.cos((position.angle * Math.PI) / 180) * radius,
-            size: Math.pow(Math.random(), 2) * 4,
-            opacity: Math.pow(Math.random() * 0.8, 2),
+            size: Math.pow(Math.random(), 2) * 3,
+            opacity: Math.pow(Math.random(), 2),
             angle: position.angle,
           });
         }
@@ -273,6 +272,10 @@ function App() {
     draw();
   }, [analyser, frequencyArray]);
 
+  function handlePlay() {
+    audioContext?.state === "suspended" && audioContext.resume();
+  }
+
   return (
     <>
       <canvas
@@ -285,7 +288,12 @@ function App() {
       </div>
       <div className="audio-wrapper">
         <Uploader audioRef={audioRef} />
-        <audio ref={audioRef} controls></audio>
+        <audio
+          ref={audioRef}
+          src="octilary.mp3"
+          controls
+          onPlay={handlePlay}
+        ></audio>
       </div>
     </>
   );
