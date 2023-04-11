@@ -230,6 +230,7 @@ function App() {
               ? particle.angle
               : particle.angle + angleChange;
           particle.speed = Math.pow(currentLoudness, 15) + 0.1;
+          particle.opacity -= 0.001 * particle.speed;
           particle.x +=
             Math.sin((particle.angle * Math.PI) / 180) * particle.speed;
           particle.y +=
@@ -240,7 +241,8 @@ function App() {
             particle.x >= canvas.width ||
             particle.x <= 0 ||
             particle.y >= canvas.height ||
-            particle.y <= 0
+            particle.y <= 0 ||
+            particle.opacity <= 0
           ) {
             position.particleCoordinateArray.splice(index, 1);
           }
