@@ -189,7 +189,7 @@ function App() {
     // Update the coordinates of the flying particles
     function updateParticleCoordinates(centerX, centerY, radius) {
       // Loop through and calculate the left half of the particle coordinates - the right half will mirror the left
-      for (let i = 0; i <= particleCoordinates.length / 2; i++) {
+      for (let i = 0; i < particleCoordinates.length / 2; i++) {
         //
         const x =
           centerX +
@@ -201,7 +201,7 @@ function App() {
         const opacity = Math.pow(Math.random(), 2);
 
         // As the loudness increases, the chance of a particle being generated should increase
-        if (Math.pow(currentLoudness, 12) > Math.random() * 20) {
+        if (Math.pow(currentLoudness, 12) > Math.random() * 30) {
           particleCoordinates[i].particleCoordinateArray.push({
             x,
             y,
