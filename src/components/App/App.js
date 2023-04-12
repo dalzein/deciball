@@ -57,14 +57,13 @@ function App() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     const ringCoordinates = [];
-    const secondaryRingCoordinates = [];
     const particleCoordinates = [];
 
     let radius = Math.min(canvas.width, canvas.height) / 4;
     let currentLoudness = 0;
 
     // Set up the empty 2d particle array for the flying particles
-    for (let angle = 0; angle < 360; angle += 1) {
+    for (let angle = 90; angle < 450; angle += 1) {
       particleCoordinates.push({
         particleCoordinateArray: [],
         angle: angle,
@@ -81,7 +80,6 @@ function App() {
       });
 
       ringCoordinates.push(JSON.parse(pointData));
-      secondaryRingCoordinates.push(JSON.parse(pointData));
     }
 
     // Draw the flying particles
@@ -172,30 +170,10 @@ function App() {
             Math.sin((-ringCoordinates[i].angle * Math.PI) / 180) *
             ringCoordinates[i].distanceFactor;
 
-        secondaryRingCoordinates[i].distanceFactor = Math.max(
-          1,
-          0.6 * (1 + 45 * audioValue)
-        );
-        secondaryRingCoordinates[i].x =
-          centerX +
-          radius *
-            Math.cos((-secondaryRingCoordinates[i].angle * Math.PI) / 180) *
-            secondaryRingCoordinates[i].distanceFactor;
-        secondaryRingCoordinates[i].y =
-          centerY +
-          radius *
-            Math.sin((-secondaryRingCoordinates[i].angle * Math.PI) / 180) *
-            secondaryRingCoordinates[i].distanceFactor;
-
         if (i > 0) {
           ringCoordinates[totalRingPoints - i].x =
             2 * centerX - ringCoordinates[i].x;
           ringCoordinates[totalRingPoints - i].y = ringCoordinates[i].y;
-
-          secondaryRingCoordinates[totalRingPoints - i].x =
-            2 * centerX - secondaryRingCoordinates[i].x;
-          secondaryRingCoordinates[totalRingPoints - i].y =
-            secondaryRingCoordinates[i].y;
         }
       }
 
@@ -207,47 +185,106 @@ function App() {
 
       updateParticleCoordinates(centerX, centerY, radius);
     }
-    // Updates the coordinates of the flying particles
+
+    // Update the coordinates of the flying particles
     function updateParticleCoordinates(centerX, centerY, radius) {
-      particleCoordinates.forEach((position) => {
+      // Loop through and calculate the left half of the particle coordinates - the right half will mirror the left
+      for (let i = 0; i <= particleCoordinates.length / 2; i++) {
+        //
+        const x =
+          centerX +
+          Math.cos((-particleCoordinates[i].angle * Math.PI) / 180) * radius;
+        const y =
+          centerY +
+          Math.sin((-particleCoordinates[i].angle * Math.PI) / 180) * radius;
+        const size = Math.pow(Math.random(), 2) * 3;
+        const opacity = Math.pow(Math.random(), 2);
+
         // As the loudness increases, the chance of a particle being generated should increase
         if (Math.pow(currentLoudness, 12) > Math.random() * 20) {
-          position.particleCoordinateArray.push({
-            x: centerX + Math.sin((position.angle * Math.PI) / 180) * radius,
-            y: centerY + Math.cos((position.angle * Math.PI) / 180) * radius,
-            size: Math.pow(Math.random(), 2) * 3,
-            opacity: Math.pow(Math.random(), 2),
-            angle: position.angle,
+          particleCoordinates[i].particleCoordinateArray.push({
+            x,
+            y,
+            size,
+            opacity,
+            angle: particleCoordinates[i].angle,
+          });
+          particleCoordinates[
+            particleCoordinates.length - i - 1
+          ].particleCoordinateArray.push({
+            x: 2 * centerX - x,
+            y,
+            size,
+            opacity,
           });
         }
 
-        // Update the x and y coordinates for the particle
-        position.particleCoordinateArray.forEach((particle, index) => {
+        // Update the x and y coordinates for the particles
+        for (
+          let j = 0;
+          j < particleCoordinates[i].particleCoordinateArray.length;
+          j++
+        ) {
           const angleChange = Math.random() < 0.5 ? -5 : 5;
-          particle.angle =
-            particle.angle + angleChange < position.angle - 60 ||
-            particle.angle + angleChange > position.angle + 60
-              ? particle.angle
-              : particle.angle + angleChange;
-          particle.speed = Math.pow(currentLoudness, 15) + 0.1;
-          particle.opacity -= 0.001 * particle.speed;
-          particle.x +=
-            Math.sin((particle.angle * Math.PI) / 180) * particle.speed;
-          particle.y +=
-            Math.cos((particle.angle * Math.PI) / 180) * particle.speed;
+          particleCoordinates[i].particleCoordinateArray[j].angle =
+            particleCoordinates[i].particleCoordinateArray[j].angle +
+              angleChange <
+              particleCoordinates[i].angle - 60 ||
+            particleCoordinates[i].particleCoordinateArray[j].angle +
+              angleChange >
+              particleCoordinates[i].angle + 60
+              ? particleCoordinates[i].particleCoordinateArray[j].angle
+              : particleCoordinates[i].particleCoordinateArray[j].angle +
+                angleChange;
+          particleCoordinates[i].particleCoordinateArray[j].speed =
+            Math.pow(currentLoudness, 15) + 0.1;
+          particleCoordinates[i].particleCoordinateArray[j].opacity -=
+            0.001 * particleCoordinates[i].particleCoordinateArray[j].speed;
+          particleCoordinates[i].particleCoordinateArray[j].x +=
+            Math.cos(
+              (-particleCoordinates[i].particleCoordinateArray[j].angle *
+                Math.PI) /
+                180
+            ) * particleCoordinates[i].particleCoordinateArray[j].speed;
+          particleCoordinates[i].particleCoordinateArray[j].y +=
+            Math.sin(
+              (-particleCoordinates[i].particleCoordinateArray[j].angle *
+                Math.PI) /
+                180
+            ) * particleCoordinates[i].particleCoordinateArray[j].speed;
 
           // If the particle has left the screen, remove it from the array as we no longer need to track it
           if (
-            particle.x >= canvas.width ||
-            particle.x <= 0 ||
-            particle.y >= canvas.height ||
-            particle.y <= 0 ||
-            particle.opacity <= 0
+            particleCoordinates[i].particleCoordinateArray[j].x >=
+              canvas.width ||
+            particleCoordinates[i].particleCoordinateArray[j].x <= 0 ||
+            particleCoordinates[i].particleCoordinateArray[j].y >=
+              canvas.height ||
+            particleCoordinates[i].particleCoordinateArray[j].y <= 0 ||
+            particleCoordinates[i].particleCoordinateArray[j].opacity <= 0
           ) {
-            position.particleCoordinateArray.splice(index, 1);
+            particleCoordinates[i].particleCoordinateArray.splice(j, 1);
+            particleCoordinates[
+              particleCoordinates.length - 1 - i
+            ].particleCoordinateArray.splice(j, 1);
+            continue;
           }
-        });
-      });
+
+          // Update mirrored particle coordinates (right half)
+          particleCoordinates[
+            particleCoordinates.length - 1 - i
+          ].particleCoordinateArray[j].x =
+            2 * centerX - particleCoordinates[i].particleCoordinateArray[j].x;
+          particleCoordinates[
+            particleCoordinates.length - 1 - i
+          ].particleCoordinateArray[j].y =
+            particleCoordinates[i].particleCoordinateArray[j].y;
+          particleCoordinates[
+            particleCoordinates.length - 1 - i
+          ].particleCoordinateArray[j].opacity =
+            particleCoordinates[i].particleCoordinateArray[j].opacity;
+        }
+      }
     }
 
     function draw() {
@@ -263,10 +300,6 @@ function App() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       renderParticles();
-      renderRing(
-        secondaryRingCoordinates,
-        `hsl(${360 * Math.pow(currentLoudness, 2) + 200}, 100%, 50%)`
-      );
       renderRing(ringCoordinates, "#fff");
       renderCircle();
     }
