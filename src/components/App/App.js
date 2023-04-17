@@ -201,7 +201,7 @@ function App() {
         const opacity = Math.pow(Math.random(), 2);
 
         // As the loudness increases, the chance of a particle being generated should increase
-        if (Math.pow(currentLoudness, 10) > Math.random() * 50) {
+        if (Math.pow(currentLoudness, 8) > Math.random() * 50) {
           particleCoordinates[i].particleCoordinateArray.push({
             x,
             y,
@@ -237,7 +237,7 @@ function App() {
               : particleCoordinates[i].particleCoordinateArray[j].angle +
                 angleChange;
           particleCoordinates[i].particleCoordinateArray[j].speed =
-            Math.pow(currentLoudness, 12) + 0.1;
+            Math.pow(currentLoudness, 10) + 0.1;
           particleCoordinates[i].particleCoordinateArray[j].opacity -=
             0.001 * particleCoordinates[i].particleCoordinateArray[j].speed;
           particleCoordinates[i].particleCoordinateArray[j].x +=
