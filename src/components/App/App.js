@@ -97,7 +97,7 @@ function App() {
 
     // Render the ring based on coordinates provided
     function renderRing(coordinateArray, fillColour) {
-      ctx.shadowBlur = (radius * currentLoudness) / 6;
+      ctx.shadowBlur = radius / 12;
       ctx.shadowColor = fillColour;
       ctx.fillStyle = fillColour;
       ctx.beginPath();
@@ -128,19 +128,20 @@ function App() {
       ctx.arc(
         canvas.width / 2,
         canvas.height / 2,
-        radius * currentLoudness,
+        radius * currentLoudness * 0.9,
         0,
         2 * Math.PI
       );
       ctx.strokeStyle = "#fff";
-      ctx.shadowBlur = (radius * currentLoudness) / 6;
-      ctx.shadowColor = "#fff";
-      ctx.lineWidth = radius / 5;
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 0;
       ctx.fillStyle = "#000";
       ctx.stroke();
       ctx.fill();
-      logoRef.current.style.width = `${radius * currentLoudness * 2.1}px`;
-      logoRef.current.style.height = `${radius * currentLoudness * 2.1}px`;
+      logoRef.current.style.width = `${radius * 0.9 * currentLoudness * 2.1}px`;
+      logoRef.current.style.height = `${
+        radius * 0.9 * currentLoudness * 2.1
+      }px`;
     }
 
     // Update the coordinates of the rings and particles
@@ -153,11 +154,11 @@ function App() {
       // Loop through and calculate the left half of the ring coordinates - the right half will mirror the left
       for (let i = 0; i <= totalRingPoints / 2; i++) {
         // Get the sample from the frequency array, skip the first few bins (15-20hz)
-        const audioValue = -1 / frequencyArray[i + 3];
+        const audioValue = -1 / frequencyArray[i + 2];
 
         ringCoordinates[i].distanceFactor = Math.max(
-          1,
-          0.75 * (1 + 30 * audioValue)
+          1 * currentLoudness,
+          0.65 * (1 + 30 * audioValue)
         );
         ringCoordinates[i].x =
           centerX +
