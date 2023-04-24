@@ -132,11 +132,9 @@ function App() {
         0,
         2 * Math.PI
       );
-      ctx.strokeStyle = "#fff";
       ctx.shadowBlur = 0;
       ctx.lineWidth = 0;
       ctx.fillStyle = "#000";
-      ctx.stroke();
       ctx.fill();
       logoRef.current.style.width = `${radius * 0.9 * currentLoudness * 2.1}px`;
       logoRef.current.style.height = `${
