@@ -122,24 +122,10 @@ function App() {
       ctx.fill();
     }
 
-    // Render main black circle that reacts to loudness
-    function renderCircle() {
-      ctx.beginPath();
-      ctx.arc(
-        canvas.width / 2,
-        canvas.height / 2,
-        radius * currentLoudness * 0.9,
-        0,
-        2 * Math.PI
-      );
-      ctx.shadowBlur = 0;
-      ctx.lineWidth = 0;
-      ctx.fillStyle = "#000";
-      ctx.fill();
-      logoRef.current.style.width = `${radius * 0.9 * currentLoudness * 2.1}px`;
-      logoRef.current.style.height = `${
-        radius * 0.9 * currentLoudness * 2.1
-      }px`;
+    // Adjust logo size with loudness
+    function adjustLogoSize() {
+      logoRef.current.style.width = `${radius * 0.9 * currentLoudness * 2}px`;
+      logoRef.current.style.height = `${radius * 0.9 * currentLoudness * 2}px`;
     }
 
     // Update the coordinates of the rings and particles
@@ -300,7 +286,7 @@ function App() {
 
       renderParticles();
       renderRing(ringCoordinates, "#fff");
-      renderCircle();
+      adjustLogoSize();
     }
 
     draw();
