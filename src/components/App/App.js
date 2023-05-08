@@ -310,7 +310,7 @@ function App() {
         <Uploader audioRef={audioRef} />
         <audio
           ref={audioRef}
-          src="octilary.mp3"
+          src="royalty.mp3"
           controls
           onPlay={handlePlay}
         ></audio>

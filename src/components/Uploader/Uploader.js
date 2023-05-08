@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import "./Uploader.css";
 
 function Uploader({ audioRef }) {
-  const [{ title }, setTrackInfo] = useState({ title: "Octilary" });
+  const [{ title }, setTrackInfo] = useState({ title: "Royalty (ft. Neoni)" });
 
   function handleChange(e) {
     if (e.target.files[0]) {
