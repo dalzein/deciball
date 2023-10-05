@@ -55,7 +55,7 @@ function App() {
   // Set up canvas visualiser
   useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
+    let ctx = canvas.getContext("2d");
     const ringCoordinates = [];
     const particleCoordinates = [];
 
@@ -273,6 +273,9 @@ function App() {
     }
 
     function draw() {
+      // Break animation when context is disposed
+      if (!ctx) return;
+
       requestAnimationFrame(draw);
 
       // Resize the canvas in case the browser window has been resized
@@ -290,6 +293,11 @@ function App() {
     }
 
     draw();
+
+    return () => {
+      // Dispose context to break animation so it doesn't continue running
+      ctx = null;
+    };
   }, [analyser, frequencyArray]);
 
   function handlePlay() {
