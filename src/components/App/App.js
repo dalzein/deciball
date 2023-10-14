@@ -89,6 +89,7 @@ function App() {
           ctx.beginPath();
           ctx.arc(particle.x, particle.y, particle.size, 0, 2 * Math.PI);
           ctx.closePath();
+
           ctx.fillStyle = `rgba(255, 255, 255, ${particle.opacity})`;
           ctx.fill();
         });
@@ -97,9 +98,6 @@ function App() {
 
     // Render the ring based on coordinates provided
     function renderRing(coordinateArray, fillColour) {
-      ctx.shadowBlur = radius / 12;
-      ctx.shadowColor = fillColour;
-      ctx.fillStyle = fillColour;
       ctx.beginPath();
       ctx.moveTo(coordinateArray[0].x, coordinateArray[0].y);
       for (let i = 1; i < coordinateArray.length - 1; i++) {
@@ -119,6 +117,10 @@ function App() {
         coordinateArray[0].y
       );
       ctx.closePath();
+
+      ctx.shadowBlur = radius / 12;
+      ctx.shadowColor = fillColour;
+      ctx.fillStyle = fillColour;
       ctx.fill();
     }
 

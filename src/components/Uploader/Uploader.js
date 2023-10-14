@@ -36,7 +36,7 @@ function Uploader({ audioRef }) {
         onChange={handleChange}
       ></input>
       <label htmlFor="file">
-        <span>{title ? "Change" : "Choose"} file</span>
+        <span>Upload track</span>
       </label>
       {title && (
         <div className="track-info">

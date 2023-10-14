@@ -33,12 +33,11 @@ label {
   justify-content: center;
   background-color: var(--foreground);
   color: var(--background);
-  content: "Hello";
   cursor: pointer;
   padding: 0 1rem;
   border: none;
   height: 2.25rem;
-  border-radius: 2.25rem;
+  border-radius: 0.5rem;
   transition: all 0.2s linear;
   opacity: 0.5;
 }
