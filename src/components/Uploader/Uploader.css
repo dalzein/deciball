@@ -37,7 +37,7 @@ label {
   padding: 0 1rem;
   border: none;
   height: 2.25rem;
-  border-radius: 0.5rem;
+  border-radius: 2.25rem;
   transition: all 0.2s linear;
   opacity: 0.5;
 }
