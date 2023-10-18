@@ -36,9 +36,9 @@ label {
   cursor: pointer;
   padding: 0 1rem;
   border: none;
-  height: 2.25rem;
-  border-radius: 2.25rem;
-  transition: all 0.2s linear;
+  height: 2.5rem;
+  border-radius: 2.5rem;
+  transition: opacity 250ms ease;
   opacity: 0.5;
 }
 
