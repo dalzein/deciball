@@ -6,7 +6,7 @@
   text-align: center;
 }
 
-.track-info {
+.trackInfo {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
@@ -48,10 +48,6 @@ label:hover {
 
 label > i {
   display: none !important;
-}
-
-#file-chosen {
-  display: none;
 }
 
 @media (max-width: 768px) {

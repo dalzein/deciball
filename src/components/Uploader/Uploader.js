@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "./Uploader.css";
+import styles from "./Uploader.module.css";
 
 function Uploader({ audioRef }) {
   const [{ title }, setTrackInfo] = useState({ title: "Royalty (ft. Neoni)" });
@@ -28,7 +28,7 @@ function Uploader({ audioRef }) {
   }
 
   return (
-    <div className="uploader">
+    <div className={styles.uploader}>
       <input
         id="file"
         type="file"
@@ -39,8 +39,8 @@ function Uploader({ audioRef }) {
         <span>Upload track</span>
       </label>
       {title && (
-        <div className="track-info">
-          <span className="title">{title}</span>
+        <div className={styles.trackInfo}>
+          <span className={styles.title}>{title}</span>
         </div>
       )}
     </div>

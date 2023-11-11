@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Uploader from "../Uploader/Uploader";
-import "./App.css";
+import styles from "./App.module.css";
 
 let audioSource = null;
 function App() {
@@ -313,10 +313,10 @@ function App() {
         width={window.innerWidth}
         height={window.innerHeight}
       ></canvas>
-      <div className="logo-wrapper">
-        <div className="logo" ref={logoRef}></div>
+      <div className={styles.logoWrapper}>
+        <div className={styles.logo} ref={logoRef}></div>
       </div>
-      <div className="audio-wrapper">
+      <div className={styles.audioWrapper}>
         <Uploader audioRef={audioRef} />
         <audio
           ref={audioRef}
