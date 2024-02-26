@@ -3,7 +3,7 @@ import Uploader from "../Uploader/Uploader";
 import styles from "./App.module.css";
 
 let audioSource = null;
-function App() {
+export default function App() {
   const canvasRef = useRef(null);
   const audioRef = useRef(null);
   const logoRef = useRef(null);
@@ -39,9 +39,9 @@ function App() {
 
   // User interaction is needed before we can resume the audio context
   useEffect(() => {
-    function resumeAudioContext() {
+    const resumeAudioContext = () => {
       audioContext?.state === "suspended" && audioContext.resume();
-    }
+    };
 
     document.addEventListener("touchend", resumeAudioContext);
     document.addEventListener("click", resumeAudioContext);
@@ -83,7 +83,7 @@ function App() {
     }
 
     // Draw the flying particles
-    function renderParticles() {
+    const renderParticles = () => {
       particleCoordinates.forEach((position) => {
         position.particleCoordinateArray.forEach((particle) => {
           ctx.beginPath();
@@ -94,10 +94,10 @@ function App() {
           ctx.fill();
         });
       });
-    }
+    };
 
     // Render the ring based on coordinates provided
-    function renderRing(coordinateArray, fillColour) {
+    const renderRing = (coordinateArray, fillColour) => {
       ctx.beginPath();
       ctx.moveTo(coordinateArray[0].x, coordinateArray[0].y);
       for (let i = 1; i < coordinateArray.length - 1; i++) {
@@ -122,16 +122,16 @@ function App() {
       ctx.shadowColor = fillColour;
       ctx.fillStyle = fillColour;
       ctx.fill();
-    }
+    };
 
     // Adjust logo size with loudness
-    function adjustLogoSize() {
+    const adjustLogoSize = () => {
       logoRef.current.style.width = `${radius * 0.9 * currentLoudness * 2}px`;
       logoRef.current.style.height = `${radius * 0.9 * currentLoudness * 2}px`;
-    }
+    };
 
     // Update the coordinates of the rings and particles
-    function updateCoordinates() {
+    const updateCoordinates = () => {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
@@ -171,10 +171,10 @@ function App() {
           .reduce((a, b) => a + b, 0) / ringCoordinates.length;
 
       updateParticleCoordinates(centerX, centerY, radius);
-    }
+    };
 
     // Update the coordinates of the flying particles
-    function updateParticleCoordinates(centerX, centerY, radius) {
+    const updateParticleCoordinates = (centerX, centerY, radius) => {
       // Loop through and calculate the left half of the particle coordinates - the right half will mirror the left
       for (let i = 0; i < particleCoordinates.length / 2; i++) {
         //
@@ -272,9 +272,9 @@ function App() {
             particleCoordinates[i].particleCoordinateArray[j].opacity;
         }
       }
-    }
+    };
 
-    function draw() {
+    const draw = () => {
       // Break animation when context is disposed
       if (!ctx) return;
 
@@ -292,7 +292,7 @@ function App() {
       renderParticles();
       renderRing(ringCoordinates, "#fff");
       adjustLogoSize();
-    }
+    };
 
     draw();
 
@@ -302,9 +302,9 @@ function App() {
     };
   }, [analyser, frequencyArray]);
 
-  function handlePlay() {
+  const handlePlay = () => {
     audioContext?.state === "suspended" && audioContext.resume();
-  }
+  };
 
   return (
     <>
@@ -328,5 +328,3 @@ function App() {
     </>
   );
 }
-
-export default App;

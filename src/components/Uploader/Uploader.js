@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import styles from "./Uploader.module.css";
 
-function Uploader({ audioRef }) {
+export default function Uploader({ audioRef }) {
   const [{ title }, setTrackInfo] = useState({ title: "Royalty (ft. Neoni)" });
 
-  function handleChange(e) {
+  const handleChange = (e) => {
     if (e.target.files[0]) {
       audioRef.current.src = URL.createObjectURL(e.target.files[0]);
 
@@ -25,7 +25,7 @@ function Uploader({ audioRef }) {
         },
       });
     }
-  }
+  };
 
   return (
     <div className={styles.uploader}>
@@ -46,5 +46,3 @@ function Uploader({ audioRef }) {
     </div>
   );
 }
-
-export default Uploader;
