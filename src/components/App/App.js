@@ -144,7 +144,7 @@ export default function App() {
 
         ringCoordinates[i].distanceFactor = Math.max(
           1 * currentLoudness,
-          0.65 * (1 + 30 * audioValue)
+          0.4 * (1 + 80 * audioValue)
         );
         ringCoordinates[i].x =
           centerX +
@@ -224,7 +224,7 @@ export default function App() {
               : particleCoordinates[i].particleCoordinateArray[j].angle +
                 angleChange;
           particleCoordinates[i].particleCoordinateArray[j].speed =
-            Math.pow(4 * currentLoudness - 3, 6) + 0.1;
+            Math.pow(4 * currentLoudness - 3, 4) + 0.1;
           particleCoordinates[i].particleCoordinateArray[j].opacity -=
             0.001 * particleCoordinates[i].particleCoordinateArray[j].speed;
           particleCoordinates[i].particleCoordinateArray[j].x +=
@@ -287,6 +287,7 @@ export default function App() {
 
       updateCoordinates();
 
+      // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       renderParticles();
