@@ -1,2 +1,2 @@
 # deciball
-Custom-written JavaScript audio visualiser in the style of Trap Nation
+Audio visualiser in the style of Trap Nation written in React - no third-party libraries used
