@@ -118,8 +118,8 @@ export default function App() {
       );
       ctx.closePath();
 
-      ctx.shadowBlur = radius / 12;
-      ctx.shadowColor = fillColour;
+      ctx.shadowBlur = radius / 10;
+      ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
       ctx.fillStyle = fillColour;
       ctx.fill();
     };
@@ -184,7 +184,7 @@ export default function App() {
         const y =
           centerY +
           Math.sin((-particleCoordinates[i].angle * Math.PI) / 180) * radius;
-        const size = Math.pow(Math.random(), 2) * 3;
+        const size = (Math.pow(Math.random(), 2) * 3 * radius) / 300;
         const opacity = Math.pow(Math.random(), 2);
 
         // As the loudness increases, the chance of a particle being generated should increase
@@ -326,6 +326,7 @@ export default function App() {
           onPlay={handlePlay}
         ></audio>
       </div>
+      <div className={styles.noiseFilter}></div>
     </>
   );
 }

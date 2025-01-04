@@ -1,9 +1,6 @@
 :root {
-  --pink: #ff0080;
-  --orange: #ff881a;
-  --blue: #1457ff;
   --foreground: #fff;
-  --background: #000;
+  --background: rgb(15, 17, 21);
   --foreground-secondary: #888;
 }
 
@@ -15,21 +12,14 @@
 
 html {
   background: var(--pink);
-  height: 100%;
 }
 
 body {
   color: var(--foreground);
-  font-family: "Inter", sans-serif;
-  background: radial-gradient(
-      farthest-side at bottom left,
-      var(--blue),
-      transparent
-    ),
-    radial-gradient(farthest-corner at bottom right, var(--orange), transparent);
+  font-family: "Gabarito", sans-serif;
+  background: var(--background);
   width: 100%;
-  height: 100%;
-  overflow: hidden;
+  height: 100dvh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
