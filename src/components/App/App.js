@@ -282,7 +282,7 @@ export default function App() {
 
       // Resize the canvas in case the browser window has been resized
       canvas.width = canvas.clientWidth;
-      canvas.height = window.innerHeight;
+      canvas.height = canvas.clientHeight;
       radius = Math.min(canvas.width, canvas.height) / 4;
 
       updateCoordinates();

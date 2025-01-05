@@ -10,10 +10,18 @@
   padding: 0;
 }
 
+html, body {
+  height: 100%;
+}
+
 body {
   color: var(--foreground);
   font-family: "Gabarito", sans-serif;
   background: var(--background);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  height: 100%;
 }
