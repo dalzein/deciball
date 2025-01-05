@@ -281,7 +281,7 @@ export default function App() {
       requestAnimationFrame(draw);
 
       // Resize the canvas in case the browser window has been resized
-      canvas.width = document.documentElement.clientWidth;
+      canvas.width = canvas.clientWidth;
       canvas.height = window.innerHeight;
       radius = Math.min(canvas.width, canvas.height) / 4;
 
