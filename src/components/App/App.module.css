@@ -35,8 +35,8 @@ audio:hover {
 
 .logo {
   position: absolute;
-  height: calc(min(100vw, 100dvh) / 3.5);
-  width: calc(min(100vw, 100dvh) / 3.5);
+  height: calc(min(100dvw, 100dvh) / 3.5);
+  width: calc(min(100dvw, 100dvh) / 3.5);
   background-image: url("logo.svg");
   background-repeat: no-repeat;
   background-position: center;
