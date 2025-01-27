@@ -16,7 +16,7 @@ html, body {
 
 body {
   color: var(--foreground);
-  font-family: "Gabarito", sans-serif;
+  font-family: "Inter", sans-serif;
   background: var(--background);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
