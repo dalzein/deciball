@@ -1,6 +1,6 @@
 :root {
   --foreground: #fff;
-  --background: rgb(15, 17, 21);
+  --background: #000;
   --foreground-secondary: #888;
 }
 
@@ -10,7 +10,8 @@
   padding: 0;
 }
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
