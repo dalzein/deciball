@@ -1,7 +1,7 @@
 :root {
-  --foreground: #fff;
-  --background: #000;
-  --foreground-secondary: #888;
+  --foreground: hsl(0 0% 100%);
+  --background: hsl(0 0% 0%);
+  --foreground-secondary: hsl(0 0% 50%);
 }
 
 * {

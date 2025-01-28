@@ -291,7 +291,7 @@ export default function App() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       renderParticles();
-      renderRing(ringCoordinates, "#fff");
+      renderRing(ringCoordinates, "hsl(0 0% 100%)");
       adjustLogoSize();
     };
 
