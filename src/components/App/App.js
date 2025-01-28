@@ -90,7 +90,7 @@ export default function App() {
           ctx.arc(particle.x, particle.y, particle.size, 0, 2 * Math.PI);
           ctx.closePath();
 
-          ctx.fillStyle = `rgba(255, 255, 255, ${particle.opacity})`;
+          ctx.fillStyle = `hsl(0 0% 100% / ${particle.opacity})`;
           ctx.fill();
         });
       });
@@ -119,7 +119,7 @@ export default function App() {
       ctx.closePath();
 
       ctx.shadowBlur = radius / 10;
-      ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
+      ctx.shadowColor = "hsl(0 0% 100% / 50%)";
       ctx.fillStyle = fillColour;
       ctx.fill();
     };
