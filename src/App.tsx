@@ -1,46 +1,67 @@
-import React, { useEffect, useRef, useState } from "react";
-import Uploader from "../Uploader/Uploader";
+import { useEffect, useRef } from "react";
 import styles from "./App.module.css";
+import audio from "./assets/royalty.mp3";
+import Uploader from "./components/Uploader/Uploader";
 
-let audioSource = null;
+type RingPoint = {
+  angle: number;
+  x: number;
+  y: number;
+  distanceFactor: number;
+};
+
+type Particle = {
+  x: number;
+  y: number;
+  size: number;
+  opacity: number;
+  angle: number;
+  speed: number;
+};
+
+type ParticleCoordinates = {
+  particleCoordinateArray: Particle[];
+  angle: number;
+};
+
+const totalRingPoints = 48;
+const binsToSkip = 2;
+const frequencyArray = new Float32Array(totalRingPoints / 2 + binsToSkip + 1);
+
 export default function App() {
-  const canvasRef = useRef(null);
-  const audioRef = useRef(null);
-  const logoRef = useRef(null);
-  const totalRingPoints = 48;
-  const [{ audioContext, analyser, frequencyArray }, setAudioData] = useState({
-    audioContext: null,
-    analyser: null,
-    frequencyArray: new Float32Array(totalRingPoints),
-  });
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const logoRef = useRef<HTMLDivElement | null>(null);
+  const audioContextRef = useRef<AudioContext>(
+    new AudioContext({ sampleRate: 44100 })
+  );
+  const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
 
-  // Set up audio context
   useEffect(() => {
-    if (!audioSource) {
-      // Create audio context
-      const audioElement = audioRef.current;
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      const newAudioContext = new AudioContext({ sampleRate: 44100 });
-      audioSource = newAudioContext.createMediaElementSource(audioElement);
+    const audioElement = audioRef.current;
+
+    if (!audioElement) return;
+
+    if (!audioSourceRef.current) {
+      // Create audio source
+      audioSourceRef.current =
+        audioContextRef.current.createMediaElementSource(audioElement);
 
       // Create analyser
-      const newAnalyser = newAudioContext.createAnalyser();
-      newAnalyser.fftSize = 8192;
-      audioSource.connect(newAnalyser);
-      newAnalyser.connect(newAudioContext.destination);
-
-      setAudioData((previousValue) => ({
-        ...previousValue,
-        audioContext: newAudioContext,
-        analyser: newAnalyser,
-      }));
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 8192;
+      audioSourceRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
     }
   }, []);
 
   // User interaction is needed before we can resume the audio context
   useEffect(() => {
     const resumeAudioContext = () => {
-      audioContext?.state === "suspended" && audioContext.resume();
+      if (audioContextRef.current?.state === "suspended") {
+        audioContextRef.current.resume();
+      }
     };
 
     document.addEventListener("touchend", resumeAudioContext);
@@ -50,14 +71,17 @@ export default function App() {
       document.removeEventListener("touchend", resumeAudioContext);
       document.removeEventListener("click", resumeAudioContext);
     };
-  }, [audioContext]);
+  }, []);
 
   // Set up canvas visualiser
   useEffect(() => {
     const canvas = canvasRef.current;
+    if (!canvas) return;
+
     let ctx = canvas.getContext("2d");
-    const ringCoordinates = [];
-    const particleCoordinates = [];
+    if (!ctx) return;
+    const ringCoordinates: RingPoint[] = [];
+    const particleCoordinates: ParticleCoordinates[] = [];
 
     let radius = Math.min(canvas.width, canvas.height) / 4;
     let currentLoudness = 0;
@@ -86,10 +110,11 @@ export default function App() {
     const renderParticles = () => {
       particleCoordinates.forEach((position) => {
         position.particleCoordinateArray.forEach((particle) => {
+          if (!ctx) return;
+
           ctx.beginPath();
           ctx.arc(particle.x, particle.y, particle.size, 0, 2 * Math.PI);
           ctx.closePath();
-
           ctx.fillStyle = `hsl(0 0% 100% / ${particle.opacity})`;
           ctx.fill();
         });
@@ -97,12 +122,14 @@ export default function App() {
     };
 
     // Render the ring based on coordinates provided
-    const renderRing = (coordinateArray, fillColour) => {
+    const renderRing = (coordinateArray: RingPoint[], fillColour: string) => {
+      if (!ctx) return;
+
       ctx.beginPath();
       ctx.moveTo(coordinateArray[0].x, coordinateArray[0].y);
       for (let i = 1; i < coordinateArray.length - 1; i++) {
-        var xc = (coordinateArray[i].x + coordinateArray[i + 1].x) / 2;
-        var yc = (coordinateArray[i].y + coordinateArray[i + 1].y) / 2;
+        const xc = (coordinateArray[i].x + coordinateArray[i + 1].x) / 2;
+        const yc = (coordinateArray[i].y + coordinateArray[i + 1].y) / 2;
         ctx.quadraticCurveTo(
           coordinateArray[i].x,
           coordinateArray[i].y,
@@ -126,6 +153,8 @@ export default function App() {
 
     // Adjust logo size with loudness
     const adjustLogoSize = () => {
+      if (!logoRef.current) return;
+
       logoRef.current.style.width = `${radius * 0.9 * currentLoudness * 2}px`;
       logoRef.current.style.height = `${radius * 0.9 * currentLoudness * 2}px`;
     };
@@ -135,12 +164,16 @@ export default function App() {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
-      analyser && analyser.getFloatFrequencyData(frequencyArray);
+      if (analyserRef.current) {
+        // Get the frequency data from the analyser
+        analyserRef.current.getFloatFrequencyData(frequencyArray);
+      }
 
       // Loop through and calculate the left half of the ring coordinates - the right half will mirror the left
       for (let i = 0; i <= totalRingPoints / 2; i++) {
-        // Get the sample from the frequency array, skip the first few bins (15-20hz)
-        const audioValue = -1 / frequencyArray[i + 2];
+        // Get the decibel value from the frequency array, skip the first couple of bins (around 10 hz) because nothing generally happens here
+        // We need the negative reciprocal because getFloatFrequencyData() provides the decibels relative to full scale (dBFS), and they range from -Infinity to 0
+        const audioValue = -1 / frequencyArray[i + binsToSkip];
 
         ringCoordinates[i].distanceFactor = Math.max(
           1 * currentLoudness,
@@ -174,10 +207,13 @@ export default function App() {
     };
 
     // Update the coordinates of the flying particles
-    const updateParticleCoordinates = (centerX, centerY, radius) => {
+    const updateParticleCoordinates = (
+      centerX: number,
+      centerY: number,
+      radius: number
+    ) => {
       // Loop through and calculate the left half of the particle coordinates - the right half will mirror the left
       for (let i = 0; i < particleCoordinates.length / 2; i++) {
-        //
         const x =
           centerX +
           Math.cos((-particleCoordinates[i].angle * Math.PI) / 180) * radius;
@@ -189,13 +225,17 @@ export default function App() {
 
         // As the loudness increases, the chance of a particle being generated should increase
         if (Math.pow(4 * currentLoudness - 3, 5) > Math.random() * 60) {
+          // Add particle to the array
           particleCoordinates[i].particleCoordinateArray.push({
             x,
             y,
             size,
             opacity,
             angle: particleCoordinates[i].angle,
+            speed: 0,
           });
+
+          // Update mirrored particle coordinates (right half) - the angle won't end up being used since the coordinates are mirrored
           particleCoordinates[
             particleCoordinates.length - i - 1
           ].particleCoordinateArray.push({
@@ -203,6 +243,8 @@ export default function App() {
             y,
             size,
             opacity,
+            angle: particleCoordinates[i].angle,
+            speed: 0,
           });
         }
 
@@ -301,10 +343,12 @@ export default function App() {
       // Dispose context to break animation so it doesn't continue running
       ctx = null;
     };
-  }, [analyser, frequencyArray]);
+  }, []);
 
   const handlePlay = () => {
-    audioContext?.state === "suspended" && audioContext.resume();
+    if (audioContextRef.current?.state === "suspended") {
+      audioContextRef.current.resume();
+    }
   };
 
   return (
@@ -319,12 +363,7 @@ export default function App() {
       </div>
       <div className={styles.audioWrapper}>
         <Uploader audioRef={audioRef} />
-        <audio
-          ref={audioRef}
-          src="royalty.mp3"
-          controls
-          onPlay={handlePlay}
-        ></audio>
+        <audio ref={audioRef} src={audio} controls onPlay={handlePlay}></audio>
       </div>
       <div className={styles.noiseFilter}></div>
     </>

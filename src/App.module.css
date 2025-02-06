@@ -41,7 +41,7 @@ audio:hover {
   position: absolute;
   height: calc(min(100dvw, 100dvh) / 3.5);
   width: calc(min(100dvw, 100dvh) / 3.5);
-  background-image: url("logo.svg");
+  background-image: url("assets/logo.svg");
   background-repeat: no-repeat;
   background-position: center;
 }
@@ -54,7 +54,7 @@ audio:hover {
   height: 100%;
   background-size: 7rem;
   background-repeat: repeat;
-  background-image: url("noise-filter.png");
+  background-image: url("assets/noise-filter.png");
   opacity: 0.06;
   pointer-events: none;
 }
