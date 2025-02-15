@@ -19,12 +19,10 @@ The original plan for this project was to integrate it with Spotify, but there's
 
 ## Built with
 
-- `Web Audio API` for audio frequency analysis
 - `TypeScript` because types are nice
 - `React` for the UI
 - `Vite` as the build tool
 - `music-metadata` for extracting the title metadata from the uploaded track
-- `HTML <canvas>` and a bunch of math for the animation logic
 
 ## Running locally
 
