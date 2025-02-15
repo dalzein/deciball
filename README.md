@@ -13,7 +13,7 @@ The original plan for this project was to integrate it with Spotify, but there's
 ## Frequency range
 
 1. The FFT size is set to 8192, which provides a 4096 bin count - this should ideally be as high as possible since we're magnifying the bass range, and going to 16384 seems to destroy performance
-2. For precision, the app uses `getFloatFrequencyData()` (see the [docs](https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode/getFloatFrequencyData)) - this provides the decibals relative to full scale (dBFS) at each binned frequency, where the values range from -Infinity to 0, with 0 being the loudest
+2. For precision, the app uses `getFloatFrequencyData()` - this provides the decibals relative to full scale (dBFS) at each binned frequency, where the values range from -Infinity to 0, with 0 being the loudest
 3. The sample rate is set to 44100 Hz, which gives us a 22050 Hz frequency range divided into the 4096 bins to play with, which equates to roughly 5.38 hz per bin
 4. We're only taking the first 27 bins and then skipping the first two as nothing generally happens under 10 Hz, which gives us a range of ~ 10 Hz to ~ 145 Hz
 
