@@ -2,7 +2,7 @@
 
 A bass-focused audio visualiser in the style of Trap Nation.
 
-Frequency analysis and cleansing, animation logic, particle effects, etc are all completely custom and done using loads of math, the native `Web Audio API`, and native `HTML <canvas>`.
+Frequency analysis and cleansing, animation logic, particle effects, etc are all completely custom and done using a bunch of math, the native `Web Audio API`, and native `HTML <canvas>`.
 
 The app allows you to upload an audio file and should accept most formats.
 
@@ -24,7 +24,7 @@ The original plan for this project was to integrate it with Spotify, but there's
 - `React` for the UI
 - `Vite` as the build tool
 - `music-metadata` for extracting the title metadata from the uploaded track
-- `HTML <canvas>` and loads of math for the animation logic
+- `HTML <canvas>` and a bunch of math for the animation logic
 
 ## Running locally
 
