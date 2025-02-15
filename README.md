@@ -4,7 +4,7 @@ A bass-focused audio visualiser in the style of Trap Nation.
 
 Frequency analysis and cleansing, animation logic, particle effects, etc are all completely custom and done using a bunch of math, the native `Web Audio API`, and native `HTML <canvas>`.
 
-The app allows you to upload an audio file and should accept most formats.
+The app allows you to upload an audio file and should accept most formats. `music-metadata` is used to extract the title metadata from the uploaded track.
 
 The frequency range represented is from ~ 10 Hz to ~ 145 Hz top to bottom, so tracks need to have bass in them or you'll get bored.
 
@@ -19,10 +19,10 @@ The original plan for this project was to integrate it with Spotify, but there's
 
 ## Built with
 
-- `TypeScript` because types are nice
-- `React` for the UI
-- `Vite` as the build tool
-- `music-metadata` for extracting the title metadata from the uploaded track
+- `TypeScript`
+- `React`
+- `Vite`
+- `music-metadata`
 
 ## Running locally
 
