@@ -29,5 +29,5 @@ We're only taking the first 27 bins and then skipping the first two as nothing g
 
 ## Running locally
 
-1. npm install
-2. npm run dev
+1. `npm install`
+2. `npm run dev`
