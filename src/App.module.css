@@ -46,19 +46,6 @@ audio:hover {
   background-position: center;
 }
 
-.noiseFilter {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-size: 7rem;
-  background-repeat: repeat;
-  background-image: url("assets/noise-filter.png");
-  opacity: 0.06;
-  pointer-events: none;
-}
-
 @media (max-width: 768px) {
   .audioWrapper {
     flex-direction: column;

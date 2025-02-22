@@ -365,7 +365,6 @@ export default function App() {
         <Uploader audioRef={audioRef} />
         <audio ref={audioRef} src={audio} controls onPlay={handlePlay}></audio>
       </div>
-      <div className={styles.noiseFilter}></div>
     </>
   );
 }
