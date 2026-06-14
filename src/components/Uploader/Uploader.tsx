@@ -7,23 +7,18 @@ type UploaderProps = {
 };
 
 export default function Uploader({ audioRef }: UploaderProps) {
-  const [title, setTrackInfo] = useState("Royalty (ft. Neoni)");
+  const [title, setTitle] = useState("Royalty (ft. Neoni)");
 
   const handleChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const audioElement = audioRef.current;
     const file = e.target.files?.[0];
 
     if (file && audioElement) {
-      audioRef.current.src = URL.createObjectURL(file);
+      audioElement.src = URL.createObjectURL(file);
 
-      // Read file metadata and set title
-      await parseBlob(file).then((metadata) => {
-        if (metadata.common.title) {
-          setTrackInfo(metadata.common.title);
-        } else {
-          setTrackInfo(file.name);
-        }
-      });
+      // Title the track from its metadata, falling back to the file name.
+      const metadata = await parseBlob(file);
+      setTitle(metadata.common.title || file.name);
     }
   };
 

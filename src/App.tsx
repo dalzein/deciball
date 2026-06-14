@@ -42,36 +42,34 @@ type Star = {
 
 const totalRingPoints = 48;
 const binsToSkip = 2;
-const frequencyArray = new Float32Array(totalRingPoints / 2 + binsToSkip + 1);
+// Resting dB level the spectrum eases toward while paused, so the visual winds
+// down to idle instead of freezing on whatever frame playback stopped.
+const idleDb = -100;
+const frequencyArray = new Float32Array(
+  totalRingPoints / 2 + binsToSkip + 1
+).fill(idleDb);
+
+// Number of points around the liquid core's outline.
+const liquidPoints = 96;
+
+// A blob of molten liquid flung off the core on a bass hit. It springs back to
+// the core's surface (damped) and shrinks, so it arcs out and is reabsorbed.
+type Droplet = {
+  angle: number; // direction from centre
+  r: number; // current distance from centre
+  vr: number; // radial velocity
+  vAngle: number; // slow tangential drift
+  size: number; // current radius
+};
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioContextRef = useRef<AudioContext>(
+    new AudioContext({ sampleRate: 44100 })
+  );
   const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-
-  // Create the AudioContext lazily, on first real use. Doing it inline in
-  // useRef(new AudioContext(...)) constructs a throwaway context on every
-  // render, and iOS hard-caps the number of live contexts.
-  //
-  // iOS audio hardware runs at 48kHz. Forcing a 44.1kHz context makes Safari
-  // resample the output to the hardware clock in realtime; underruns in that
-  // resampler are exactly what cause the random pitch wobble and the "last
-  // fragment loops a few times on pause" stutter. Letting iOS adopt its native
-  // rate removes that output resampler. Desktop keeps 44.1kHz so the tuned
-  // frequency -> ring-point mapping (bin widths) stays identical there.
-  const getAudioContext = () => {
-    if (!audioContextRef.current) {
-      const isIOS =
-        /iP(hone|ad|od)/.test(navigator.userAgent) ||
-        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      audioContextRef.current = new AudioContext(
-        isIOS ? {} : { sampleRate: 44100 }
-      );
-    }
-    return audioContextRef.current;
-  };
 
   useEffect(() => {
     const audioElement = audioRef.current;
@@ -79,14 +77,13 @@ export default function App() {
     if (!audioElement) return;
 
     if (!audioSourceRef.current) {
-      const audioContext = getAudioContext();
       audioSourceRef.current =
-        audioContext.createMediaElementSource(audioElement);
+        audioContextRef.current.createMediaElementSource(audioElement);
 
-      analyserRef.current = audioContext.createAnalyser();
+      analyserRef.current = audioContextRef.current.createAnalyser();
       analyserRef.current.fftSize = 8192;
       audioSourceRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(audioContext.destination);
+      analyserRef.current.connect(audioContextRef.current.destination);
     }
   }, []);
 
@@ -103,40 +100,40 @@ export default function App() {
 
     // Tiny buffer holding a heavily downscaled copy of the scene, blitted back
     // upscaled to produce a cheap blur/bloom.
-    const glowScale = 0.13;
+    const glowScale = 0.25;
     const glowCanvas = document.createElement("canvas");
     const glowCtx = glowCanvas.getContext("2d")!;
 
-    // Pixelation buffers, all at the low "chunky pixel" resolution. The frame
-    // (sharp scene + bloom) is assembled in `frameCanvas`, then split into RGB
-    // channels (via `chScratchCanvas`) and recombined with an offset into
-    // `abCanvas` for the chromatic aberration. Finally it is composited onto the
-    // persistent `pixelCanvas` (which holds the motion-trail history) and that
-    // is nearest-neighbour upscaled to the screen for the arcade / 8-bit look.
-    const pixelSize = 6; // device px per chunky pixel
+    // Full-resolution post-processing buffers. The sharp scene is copied into
+    // `frameCanvas`, split into RGB channels (via `chScratchCanvas`) and
+    // recombined with an offset into `abCanvas` for the chromatic aberration.
+    // The aberrated frame is laid over the persistent `trailCanvas` (the
+    // motion-trail history), which is blitted to the screen with a bass-driven
+    // zoom punch and a fresh bloom on top.
     const frameCanvas = document.createElement("canvas");
     const chScratchCanvas = document.createElement("canvas");
     const abCanvas = document.createElement("canvas");
-    const pixelCanvas = document.createElement("canvas");
+    const trailCanvas = document.createElement("canvas");
     const frameCtx = frameCanvas.getContext("2d")!;
     const chScratchCtx = chScratchCanvas.getContext("2d")!;
     const abCtx = abCanvas.getContext("2d")!;
-    const pixelCtx = pixelCanvas.getContext("2d")!;
-
-    // The scanline overlay never changes between frames (it only depends on the
-    // viewport size and the constant pixelSize), so we render it once into this
-    // buffer on resize and blit it in a single drawImage per frame instead of
-    // looping hundreds of fillRects every frame.
-    const scanlineCanvas = document.createElement("canvas");
-    const scanlineCtx = scanlineCanvas.getContext("2d")!;
+    const trailCtx = trailCanvas.getContext("2d")!;
 
     const ringCoordinates: RingPoint[] = [];
     const particleCoordinates: ParticleCoordinates[] = [];
     const shockwaves: Shockwave[] = [];
+    const droplets: Droplet[] = [];
     let stars: Star[] = [];
 
     let radius = Math.min(canvas.width, canvas.height) / 4;
     let currentLoudness = 0;
+    // Mean radius of the liquid core this frame, shared so droplets spawn at and
+    // spring back to its surface.
+    let liquidR = 0;
+    // The blob's smooth-body radius factor = the minimum ring distanceFactor
+    // (the floor the non-spike points sit at). The centre disc sits just inside
+    // this so the white blob shows as a constant-thickness border ring.
+    let bodyFactor = 0;
 
     // Smoothed/derived signals used purely for the visuals (they never feed
     // back into the bass extraction maths below).
@@ -144,9 +141,16 @@ export default function App() {
     let bassPunch = 0; // how far above the floor we currently are (the transient)
     let smoothPunch = 0; // eased punch, so colour/brightness don't strobe
     let aberration = 0; // fast-attack/slow-decay envelope driving the RGB split
+    let aberrationBase = 0; // sustained split level while the track is hitting
+    let flash = 0; // supernova white-bloom envelope, fires on the biggest hits
+    let godray = 0; // volumetric light-shaft intensity envelope
+    let rayAngle = 0; // god-ray rotation, advanced while a burst is visible
+    let punchZoom = 0; // screen zoom-push envelope on each kick
     let hue = 265; // base hue, slowly drifts over time
     let time = 0;
     let lastShockTime = -1000;
+    let lastFlashTime = -1000;
+    let lastDropletTime = -1000;
 
     // Build a starfield scaled to the viewport for a sense of depth
     const seedStars = () => {
@@ -164,51 +168,29 @@ export default function App() {
     };
 
     for (let angle = 90; angle < 450; angle += 1) {
-      particleCoordinates.push({
-        particleCoordinateArray: [],
-        angle: angle,
-      });
+      particleCoordinates.push({ particleCoordinateArray: [], angle });
     }
 
     for (let angle = 90; angle < 450; angle += 360 / totalRingPoints) {
-      const pointData = JSON.stringify({
-        angle: angle,
+      ringCoordinates.push({
+        angle,
         x: (canvas.width / 2) * Math.cos((-angle * Math.PI) / 180),
         y: (canvas.height / 2) * Math.sin((-angle * Math.PI) / 180),
         distanceFactor: 1,
       });
-
-      ringCoordinates.push(JSON.parse(pointData));
     }
 
     const resize = () => {
       canvas.width = canvas.clientWidth;
       canvas.height = canvas.clientHeight;
-      sceneCanvas.width = canvas.width;
-      sceneCanvas.height = canvas.height;
+      sceneCanvas.width = frameCanvas.width = chScratchCanvas.width =
+        abCanvas.width = trailCanvas.width = canvas.width;
+      sceneCanvas.height = frameCanvas.height = chScratchCanvas.height =
+        abCanvas.height = trailCanvas.height = canvas.height;
       glowCanvas.width = Math.max(1, Math.round(canvas.width * glowScale));
       glowCanvas.height = Math.max(1, Math.round(canvas.height * glowScale));
-      const pw = Math.max(1, Math.round(canvas.width / pixelSize));
-      const ph = Math.max(1, Math.round(canvas.height / pixelSize));
-      frameCanvas.width = chScratchCanvas.width = abCanvas.width =
-        pixelCanvas.width = pw;
-      frameCanvas.height = chScratchCanvas.height = abCanvas.height =
-        pixelCanvas.height = ph;
       radius = Math.min(canvas.width, canvas.height) / 4;
       seedStars();
-      buildScanlines();
-    };
-
-    // Pre-render the static scanline overlay at full screen resolution.
-    const buildScanlines = () => {
-      scanlineCanvas.width = canvas.width;
-      scanlineCanvas.height = canvas.height;
-      scanlineCtx.clearRect(0, 0, canvas.width, canvas.height);
-      scanlineCtx.fillStyle = "hsl(0 0% 0% / 0.22)";
-      const lineH = Math.max(1, Math.round(pixelSize / 5));
-      for (let y = pixelSize - lineH; y < canvas.height; y += pixelSize) {
-        scanlineCtx.fillRect(0, y, canvas.width, lineH);
-      }
     };
     resize();
 
@@ -234,14 +216,11 @@ export default function App() {
       sceneCtx.globalAlpha = 1;
     };
 
-    // Comet sprite atlas. The streaks used to be built from a per-particle
-    // linear gradient every frame — an object allocation plus two colour-string
-    // parses per particle, and there can be hundreds of particles on a bass
-    // hit. Instead we pre-render one streak texture per hue bucket a single
-    // time, then just translate/rotate/scale/drawImage them. Each sprite is a
-    // round-capped line filled with a tail(transparent)→head(opaque) gradient
-    // in a normalised 0→length space; per-particle opacity is applied with
-    // globalAlpha at draw time. Hue is quantised to `cometBuckets` steps.
+    // Comet sprite atlas: one pre-rendered streak texture per hue bucket, so the
+    // hundreds of particles on a bass hit just translate/rotate/scale/drawImage a
+    // sprite instead of each rebuilding a gradient every frame. Each sprite is a
+    // round-capped line with a tail(transparent)→head(opaque) gradient;
+    // per-particle opacity is applied via globalAlpha at draw time.
     const cometBuckets = 36; // 360 / 36 = 10° hue resolution
     const cometSpriteLen = 64; // sprite length in px (mapped to streak length)
     const cometCoreW = 12; // sprite line thickness (mapped to streak width)
@@ -254,8 +233,10 @@ export default function App() {
       sprite.height = cometSpriteH;
       const sctx = sprite.getContext("2d")!;
       const grad = sctx.createLinearGradient(0, 0, cometSpriteLen, 0);
-      grad.addColorStop(0, `hsl(${h} 100% 78% / 0)`);
-      grad.addColorStop(1, `hsl(${h} 100% 78% / 1)`);
+      // Near-white with only a faint hue tint, so the chromatic aberration
+      // fringes read hard against the streaks the same way they do on the core.
+      grad.addColorStop(0, `hsl(${h} 25% 92% / 0)`);
+      grad.addColorStop(1, `hsl(${h} 25% 92% / 1)`);
       sctx.strokeStyle = grad;
       sctx.lineWidth = cometCoreW;
       sctx.lineCap = "round";
@@ -284,7 +265,7 @@ export default function App() {
           if (streakLen < particle.size) {
             sceneCtx.beginPath();
             sceneCtx.arc(particle.x, particle.y, particle.size, 0, 2 * Math.PI);
-            sceneCtx.fillStyle = `hsl(${particle.hue} 100% 78% / ${particle.opacity})`;
+            sceneCtx.fillStyle = `hsl(${particle.hue} 25% 92% / ${particle.opacity})`;
             sceneCtx.fill();
             return;
           }
@@ -315,9 +296,6 @@ export default function App() {
     };
 
     const renderRing = (coordinateArray: RingPoint[]) => {
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-
       sceneCtx.beginPath();
       sceneCtx.moveTo(coordinateArray[0].x, coordinateArray[0].y);
       for (let i = 1; i < coordinateArray.length - 1; i++) {
@@ -338,97 +316,144 @@ export default function App() {
       );
       sceneCtx.closePath();
 
-      // Colour gets hotter (brighter + whiter core) the louder the bass
-      const intensity = Math.min(1, smoothPunch * 2.2);
-      const gradient = sceneCtx.createRadialGradient(
-        centerX,
-        centerY,
-        radius * 0.2,
-        centerX,
-        centerY,
-        radius * 1.6
-      );
-      gradient.addColorStop(0, `hsl(${hue} 100% ${70 + intensity * 25}%)`);
-      gradient.addColorStop(0.6, `hsl(${hue + 35} 100% ${60 + intensity * 20}%)`);
-      gradient.addColorStop(1, `hsl(${hue + 70} 95% 55%)`);
+      // Trap-Nation silhouette, the right way round: the reactive blob is filled
+      // SOLID WHITE. A central black disc (renderCenterDisc) then masks its body,
+      // leaving a constant-thickness white ring (the "border") around the disc;
+      // the bass-driven spikes are the same white blob protruding past that ring,
+      // so they blend straight in. The chromatic aberration bites the white edges.
+      sceneCtx.fillStyle = "hsl(0 0% 100%)";
+      sceneCtx.fill();
+    };
 
-      sceneCtx.fillStyle = gradient;
+    // A plain black disc drawn in front of the white blob, sitting just INSIDE
+    // the blob's smooth body (bodyFactor = the distanceFactor floor). The white
+    // blob therefore shows as a constant-thickness ring around the disc — that
+    // ring IS the border (no separate stroke needed), and the bass spikes are
+    // the same white blob protruding further out, so they blend straight into
+    // it. At rest only the bordered circle shows; on a hit the spikes erupt.
+    const borderWidth = 0.07; // ring thickness as a fraction of `radius`
+    const renderCenterDisc = () => {
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const discR = radius * bodyFactor - radius * borderWidth;
+      if (discR <= 0) return;
+      sceneCtx.globalCompositeOperation = "source-over";
+      sceneCtx.fillStyle = "hsl(0 0% 0%)";
+      sceneCtx.beginPath();
+      sceneCtx.arc(centerX, centerY, discR, 0, 2 * Math.PI);
       sceneCtx.fill();
     };
 
     const renderCore = () => {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
-      // Kept deliberately smaller than the reactive ring so the ring stays the
-      // hero; it still "breathes" with the track plus a kick on transients.
-      const coreR =
-        radius * 0.42 * currentLoudness * (1 + smoothPunch * 0.7) + radius * 0.04;
-      if (coreR <= 0) return;
 
       sceneCtx.save();
 
-      // Outer corona — large soft coloured halo
-      const corona = sceneCtx.createRadialGradient(
+      // --- Liquid molten core ---------------------------------------------
+      // A single glowing blob of white-hot liquid. Its outline is a full-circle
+      // organic shape built from integer sine harmonics (so it is inherently
+      // seamless — no mirror cusp), whose phases drift over time, so it morphs
+      // and slowly churns like liquid. The wobble amplitude grows with the bass
+      // so it agitates harder on hits, and the whole thing swells on transients.
+      // Deliberately NOT left/right mirrored: free asymmetry reads far more
+      // "alive" than a symmetric lump. White-on-dark is exactly what the
+      // chromatic aberration wants, so its edge fringes hard.
+      const baseR = radius * 0.26 * (1 + smoothPunch * 0.5) + radius * 0.05;
+      liquidR = baseR;
+      const a1 = 0.12 * (1 + smoothPunch * 1.2);
+      const a2 = 0.08 * (1 + smoothPunch * 1.5);
+      const a3 = 0.05 * (1 + smoothPunch * 2);
+
+      const px: number[] = [];
+      const py: number[] = [];
+      for (let i = 0; i < liquidPoints; i++) {
+        const th = (i / liquidPoints) * Math.PI * 2;
+        const rr =
+          baseR *
+          (1 +
+            a1 * Math.sin(2 * th + time * 0.0006) +
+            a2 * Math.sin(3 * th - time * 0.0009) +
+            a3 * Math.sin(5 * th + time * 0.0013));
+        px.push(centerX + Math.cos(th) * rr);
+        py.push(centerY + Math.sin(th) * rr);
+      }
+
+      // Smooth the closed loop with quadratic curves through the point
+      // midpoints (starting on the midpoint of the seam so it joins cleanly).
+      const n = px.length;
+      sceneCtx.beginPath();
+      sceneCtx.moveTo((px[n - 1] + px[0]) / 2, (py[n - 1] + py[0]) / 2);
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        sceneCtx.quadraticCurveTo(
+          px[i],
+          py[i],
+          (px[i] + px[j]) / 2,
+          (py[i] + py[j]) / 2
+        );
+      }
+      sceneCtx.closePath();
+
+      const molten = sceneCtx.createRadialGradient(
         centerX,
         centerY,
         0,
         centerX,
         centerY,
-        coreR * 2.6
+        baseR * 1.25
       );
-      corona.addColorStop(0, `hsl(${hue} 100% 70% / 0.5)`);
-      corona.addColorStop(0.4, `hsl(${hue + 30} 100% 60% / 0.22)`);
-      corona.addColorStop(1, `hsl(${hue + 60} 100% 50% / 0)`);
-      sceneCtx.fillStyle = corona;
-      sceneCtx.beginPath();
-      sceneCtx.arc(centerX, centerY, coreR * 2.6, 0, 2 * Math.PI);
-      sceneCtx.fill();
-
-      // The orb itself — white-hot centre fading into the hue
-      const orb = sceneCtx.createRadialGradient(
-        centerX,
-        centerY,
-        0,
-        centerX,
-        centerY,
-        coreR
-      );
-      orb.addColorStop(0, `hsl(${hue} 100% 96%)`);
-      orb.addColorStop(0.45, `hsl(${hue} 100% 78%)`);
-      orb.addColorStop(1, `hsl(${hue + 40} 100% 58%)`);
-      sceneCtx.fillStyle = orb;
-      sceneCtx.beginPath();
-      sceneCtx.arc(centerX, centerY, coreR, 0, 2 * Math.PI);
-      sceneCtx.fill();
-
-      // A cluster of orbiting rings, like electron shells around a nucleus.
-      // Each sits at a different radius, tilts and spins at its own rate and
-      // direction, and the whole set pulses outward on bass hits.
-      const orbitCount = 5;
+      molten.addColorStop(0, `hsl(0 0% 100%)`);
+      molten.addColorStop(0.55, `hsl(0 0% 95%)`);
+      molten.addColorStop(1, `hsl(0 0% 80% / 0.85)`);
       sceneCtx.globalCompositeOperation = "lighter";
-      for (let r = 0; r < orbitCount; r++) {
-        const orbitR =
-          coreR * (1.18 + r * 0.16) * (1 + smoothPunch * 0.15);
-        // Tilt animates so each ring tips between edge-on and face-on
-        const tilt = Math.sin(time * 0.0005 + r * 1.3);
-        const radiusY = orbitR * (0.16 + Math.abs(tilt) * 0.62);
-        const rotation =
-          time * 0.0006 * (r % 2 === 0 ? 1 : -1) + r * 0.7;
-        sceneCtx.lineWidth = 2;
-        sceneCtx.strokeStyle = `hsl(${hue + 25 + r * 24} 100% 72% / ${
-          0.45 - r * 0.05
-        })`;
+      sceneCtx.fillStyle = molten;
+      sceneCtx.fill();
+
+      // --- Droplets -------------------------------------------------------
+      // Update + draw the flung droplets. They spring back to the core surface
+      // (damped) and shrink, so each arcs out and is reabsorbed.
+      for (let i = droplets.length - 1; i >= 0; i--) {
+        const drop = droplets[i];
+        drop.vr += (baseR - drop.r) * 0.025; // spring to the surface
+        drop.vr *= 0.94; // damping
+        drop.r += drop.vr;
+        drop.angle += drop.vAngle;
+        drop.size *= 0.975; // slowly shrink → reabsorbed
+        if (drop.size < radius * 0.004) {
+          droplets.splice(i, 1);
+          continue;
+        }
+        const dx = centerX + Math.cos(drop.angle) * drop.r;
+        const dy = centerY + Math.sin(drop.angle) * drop.r;
+        const dg = sceneCtx.createRadialGradient(dx, dy, 0, dx, dy, drop.size * 2);
+        dg.addColorStop(0, `hsl(0 0% 100% / 0.95)`);
+        dg.addColorStop(1, `hsl(0 0% 90% / 0)`);
+        sceneCtx.fillStyle = dg;
         sceneCtx.beginPath();
-        sceneCtx.ellipse(
+        sceneCtx.arc(dx, dy, drop.size * 2, 0, 2 * Math.PI);
+        sceneCtx.fill();
+      }
+
+      // Supernova flash — a fast white bloom over the core on big hits, so heavy
+      // drops read as genuinely bigger than ordinary kicks.
+      if (flash > 0.01) {
+        const fr = baseR * (2 + flash * 3);
+        const fg = sceneCtx.createRadialGradient(
           centerX,
           centerY,
-          orbitR,
-          radiusY,
-          rotation,
           0,
-          2 * Math.PI
+          centerX,
+          centerY,
+          fr
         );
-        sceneCtx.stroke();
+        fg.addColorStop(0, `hsl(0 0% 100% / ${0.9 * flash})`);
+        fg.addColorStop(0.5, `hsl(0 0% 95% / ${0.4 * flash})`);
+        fg.addColorStop(1, `hsl(0 0% 80% / 0)`);
+        sceneCtx.fillStyle = fg;
+        sceneCtx.beginPath();
+        sceneCtx.arc(centerX, centerY, fr, 0, 2 * Math.PI);
+        sceneCtx.fill();
       }
 
       sceneCtx.restore();
@@ -456,12 +481,58 @@ export default function App() {
       sceneCtx.restore();
     };
 
+    // Volumetric light shafts radiating from the core on bass hits: a handful of
+    // long, thin additive gradient blades that fan out and spin, their brightness
+    // driven by the `godray` envelope so they bloom in on a kick and fade out.
+    const rayCount = 12;
+    const renderGodRays = () => {
+      if (godray < 0.02) return;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const len = Math.max(canvas.width, canvas.height);
+      sceneCtx.save();
+      sceneCtx.globalCompositeOperation = "lighter";
+      sceneCtx.translate(centerX, centerY);
+      sceneCtx.rotate(rayAngle);
+      for (let i = 0; i < rayCount; i++) {
+        // Stagger length/intensity so the fan isn't perfectly uniform.
+        const wobble = 0.6 + 0.4 * Math.sin(i * 2.3 + time * 0.001);
+        sceneCtx.save();
+        sceneCtx.rotate((i / rayCount) * Math.PI * 2);
+        const grad = sceneCtx.createLinearGradient(0, 0, len, 0);
+        grad.addColorStop(
+          0,
+          `hsl(${hue + 40} 100% 85% / ${0.45 * godray * wobble})`
+        );
+        grad.addColorStop(1, `hsl(${hue + 40} 100% 70% / 0)`);
+        sceneCtx.fillStyle = grad;
+        const halfW = radius * 0.05 * wobble;
+        sceneCtx.beginPath();
+        sceneCtx.moveTo(0, -halfW);
+        sceneCtx.lineTo(len, -halfW * 0.15);
+        sceneCtx.lineTo(len, halfW * 0.15);
+        sceneCtx.lineTo(0, halfW);
+        sceneCtx.closePath();
+        sceneCtx.fill();
+        sceneCtx.restore();
+      }
+      sceneCtx.restore();
+    };
+
     const updateCoordinates = () => {
       const centerX = canvas.width / 2;
       const centerY = canvas.height / 2;
 
-      if (analyserRef.current) {
+      // While playing, read the live spectrum. While paused, the analyser output
+      // is frozen (the context is suspended), so instead ease the spectrum
+      // toward silence — the blob relaxes to its idle ring and the particles
+      // slow and stop, rather than locking on the frame playback stopped.
+      if (analyserRef.current && !audioRef.current?.paused) {
         analyserRef.current.getFloatFrequencyData(frequencyArray);
+      } else {
+        for (let k = 0; k < frequencyArray.length; k++) {
+          frequencyArray[k] += (idleDb - frequencyArray[k]) * 0.06;
+        }
       }
 
       // Loop through and calculate the left half of the ring coordinates - the right half will mirror the left
@@ -493,12 +564,22 @@ export default function App() {
       }
 
       // The "loudness" will be the average distanceFactor value of the ring
-      // coordinates (plain loop to avoid allocating an array every frame).
+      // coordinates (plain loop to avoid allocating an array every frame). We
+      // also track the minimum, which is the blob's smooth-body radius factor
+      // (the floor the non-spike points sit at) used to size the centre disc.
+      // The minimum is taken over only the COMPUTED half (0..totalRingPoints/2):
+      // the right-half points only have their x/y mirrored, so their
+      // distanceFactor is stale (stuck at the initial 1) and would wrongly pin
+      // the body factor at 1 once the real floor climbs above 1 on loud parts.
       let loudnessSum = 0;
+      let minFactor = Infinity;
       for (let k = 0; k < ringCoordinates.length; k++) {
-        loudnessSum += ringCoordinates[k].distanceFactor;
+        const f = ringCoordinates[k].distanceFactor;
+        loudnessSum += f;
+        if (k <= totalRingPoints / 2 && f < minFactor) minFactor = f;
       }
       currentLoudness = loudnessSum / ringCoordinates.length;
+      bodyFactor = minFactor;
 
       // --- Derived visual signals (do not affect the extraction above) ---
       // Slow floor we compare against, then the transient above that floor.
@@ -508,9 +589,41 @@ export default function App() {
 
       // Aberration envelope: snap up instantly on a hit, then decay. Unlike the
       // eased smoothPunch this preserves the sharp transient, so the RGB split
-      // punches on every bass hit and trails off like a glitch. High gain +
-      // slow decay keep it obvious even on moderate bass.
-      aberration = Math.max(aberration * 0.87, bassPunch * 45);
+      // punches on every bass hit and trails off like a glitch. The gain is high
+      // because the split now runs at full resolution and lands against the
+      // white core/particles, where we want it to really bite. Decay is a touch
+      // slow so each hit's split lingers long enough to actually be seen.
+      aberration = Math.max(aberration * 0.9, bassPunch * 150);
+
+      // Sustained baseline that builds up while the track is actively hitting
+      // and decays away during quiet/idle. This is what keeps the split visibly
+      // present the WHOLE time music plays, instead of only for the instant
+      // after a big hit. Fast attack, slow release so it holds between beats; at
+      // idle there are no hits, so it settles to ~0 and start-up is unchanged.
+      const aberrationTarget = Math.min(1, bassPunch * 8);
+      aberrationBase +=
+        (aberrationTarget - aberrationBase) *
+        (aberrationTarget > aberrationBase ? 0.2 : 0.02);
+
+      // Screen zoom-push: snaps out on a kick, eases back. Always >= 0 so the
+      // final blit only ever scales up — no background gaps at the edges.
+      punchZoom = Math.max(punchZoom * 0.86, bassPunch * 0.8);
+
+      // God-ray intensity follows the same fast-attack/decay shape, clamped.
+      godray = Math.max(godray * 0.9, Math.min(1, bassPunch * 5));
+      // Spin the ray fan while it's actually visible: the rate is tied to the
+      // envelope, so each burst whips around as it flares and decelerates as it
+      // fades, instead of crawling at a constant speed. It just holds its angle
+      // between bursts (when the rays are invisible anyway).
+      rayAngle += godray * 0.07;
+
+      // Supernova flash: only the biggest, spaced-out hits trigger it, then it
+      // decays fast so heavy drops read as bigger than ordinary kicks.
+      flash *= 0.88;
+      if (bassPunch > 0.16 && time - lastFlashTime > 220) {
+        lastFlashTime = time;
+        flash = 1;
+      }
 
       // Hue drifts slowly and smoothly over time, deliberately independent of
       // the bass level so the colour never jumps or flickers on hits. The bass
@@ -529,6 +642,24 @@ export default function App() {
         });
       }
 
+      // Fling molten droplets off the core. This has its own, much lower
+      // threshold and shorter cooldown than the shockwave above, so the surface
+      // stays lively on ordinary kicks instead of only erupting on huge hits.
+      // The count scales with how hard the hit is.
+      if (bassPunch > 0.035 && time - lastDropletTime > 50) {
+        lastDropletTime = time;
+        const count = 3 + Math.floor(Math.min(11, bassPunch * 36));
+        for (let d = 0; d < count && droplets.length < 160; d++) {
+          droplets.push({
+            angle: Math.random() * Math.PI * 2,
+            r: liquidR,
+            vr: radius * (0.02 + Math.random() * 0.045) * (0.8 + bassPunch * 4),
+            vAngle: (Math.random() - 0.5) * 0.05,
+            size: radius * (0.012 + Math.random() * 0.022),
+          });
+        }
+      }
+
       updateParticleCoordinates(centerX, centerY, radius);
     };
 
@@ -537,116 +668,78 @@ export default function App() {
       centerY: number,
       radius: number
     ) => {
-      // Loop through and calculate the left half of the particle coordinates - the right half will mirror the left
+      // Only the left half is simulated; the right half mirrors it across the
+      // vertical axis.
       for (let i = 0; i < particleCoordinates.length / 2; i++) {
-        const x =
-          centerX +
-          Math.cos((-particleCoordinates[i].angle * Math.PI) / 180) * radius;
-        const y =
-          centerY +
-          Math.sin((-particleCoordinates[i].angle * Math.PI) / 180) * radius;
+        const baseAngle = particleCoordinates[i].angle;
+        const leftArr = particleCoordinates[i].particleCoordinateArray;
+        const mirrorArr =
+          particleCoordinates[particleCoordinates.length - 1 - i]
+            .particleCoordinateArray;
+
+        const x = centerX + Math.cos((-baseAngle * Math.PI) / 180) * radius;
+        const y = centerY + Math.sin((-baseAngle * Math.PI) / 180) * radius;
         const size = (Math.pow(Math.random(), 2) * 3 * radius) / 300;
         const opacity = Math.pow(Math.random(), 2);
         const particleHue = hue + 20 + Math.random() * 50;
 
-        // As the loudness increases, the chance of a particle being generated should increase
+        // The louder it gets, the more likely a new particle spawns this frame.
         if (Math.pow(4 * currentLoudness - 3, 5) > Math.random() * 120) {
-          particleCoordinates[i].particleCoordinateArray.push({
+          leftArr.push({
             x,
             y,
             size,
             opacity,
-            angle: particleCoordinates[i].angle,
+            angle: baseAngle,
             speed: 0,
             hue: particleHue,
           });
-
-          // Mirror to the right half
-          particleCoordinates[
-            particleCoordinates.length - i - 1
-          ].particleCoordinateArray.push({
+          mirrorArr.push({
             x: 2 * centerX - x,
             y,
             size,
             opacity,
-            angle: particleCoordinates[i].angle,
+            angle: baseAngle,
             speed: 0,
             hue: particleHue,
           });
         }
 
-        for (
-          let j = 0;
-          j < particleCoordinates[i].particleCoordinateArray.length;
-          j++
-        ) {
-          const angleChange = Math.random() < 0.5 ? -5 : 5;
-          particleCoordinates[i].particleCoordinateArray[j].angle =
-            particleCoordinates[i].particleCoordinateArray[j].angle +
-              angleChange <
-              particleCoordinates[i].angle - 60 ||
-            particleCoordinates[i].particleCoordinateArray[j].angle +
-              angleChange >
-              particleCoordinates[i].angle + 60
-              ? particleCoordinates[i].particleCoordinateArray[j].angle
-              : particleCoordinates[i].particleCoordinateArray[j].angle +
-                angleChange;
-          particleCoordinates[i].particleCoordinateArray[j].speed =
-            Math.pow(4 * currentLoudness - 3, 4) + 0.1;
-          particleCoordinates[i].particleCoordinateArray[j].opacity -=
-            0.001 * particleCoordinates[i].particleCoordinateArray[j].speed;
-          particleCoordinates[i].particleCoordinateArray[j].x +=
-            Math.cos(
-              (-particleCoordinates[i].particleCoordinateArray[j].angle *
-                Math.PI) /
-                180
-            ) * particleCoordinates[i].particleCoordinateArray[j].speed;
-          particleCoordinates[i].particleCoordinateArray[j].y +=
-            Math.sin(
-              (-particleCoordinates[i].particleCoordinateArray[j].angle *
-                Math.PI) /
-                180
-            ) * particleCoordinates[i].particleCoordinateArray[j].speed;
+        for (let j = 0; j < leftArr.length; j++) {
+          const p = leftArr[j];
 
-          // Drop particles that have left the screen or fully faded
+          // Wander the heading by ±5°, but keep it within ±60° of the spawn angle.
+          const newAngle = p.angle + (Math.random() < 0.5 ? -5 : 5);
+          if (newAngle >= baseAngle - 60 && newAngle <= baseAngle + 60) {
+            p.angle = newAngle;
+          }
+
+          p.speed = Math.pow(4 * currentLoudness - 3, 4) + 0.1;
+          p.opacity -= 0.001 * p.speed;
+          p.x += Math.cos((-p.angle * Math.PI) / 180) * p.speed;
+          p.y += Math.sin((-p.angle * Math.PI) / 180) * p.speed;
+
+          // Drop particles that have left the screen or fully faded.
           if (
-            particleCoordinates[i].particleCoordinateArray[j].x >=
-              canvas.width ||
-            particleCoordinates[i].particleCoordinateArray[j].x <= 0 ||
-            particleCoordinates[i].particleCoordinateArray[j].y >=
-              canvas.height ||
-            particleCoordinates[i].particleCoordinateArray[j].y <= 0 ||
-            particleCoordinates[i].particleCoordinateArray[j].opacity <= 0
+            p.x >= canvas.width ||
+            p.x <= 0 ||
+            p.y >= canvas.height ||
+            p.y <= 0 ||
+            p.opacity <= 0
           ) {
-            particleCoordinates[i].particleCoordinateArray.splice(j, 1);
-            particleCoordinates[
-              particleCoordinates.length - 1 - i
-            ].particleCoordinateArray.splice(j, 1);
+            leftArr.splice(j, 1);
+            mirrorArr.splice(j, 1);
             continue;
           }
 
-          // Mirror position, opacity and velocity to the right half (velocity
-          // angle reflected across the vertical axis so the streak points right)
-          particleCoordinates[
-            particleCoordinates.length - 1 - i
-          ].particleCoordinateArray[j].x =
-            2 * centerX - particleCoordinates[i].particleCoordinateArray[j].x;
-          particleCoordinates[
-            particleCoordinates.length - 1 - i
-          ].particleCoordinateArray[j].y =
-            particleCoordinates[i].particleCoordinateArray[j].y;
-          particleCoordinates[
-            particleCoordinates.length - 1 - i
-          ].particleCoordinateArray[j].opacity =
-            particleCoordinates[i].particleCoordinateArray[j].opacity;
-          particleCoordinates[
-            particleCoordinates.length - 1 - i
-          ].particleCoordinateArray[j].speed =
-            particleCoordinates[i].particleCoordinateArray[j].speed;
-          particleCoordinates[
-            particleCoordinates.length - 1 - i
-          ].particleCoordinateArray[j].angle =
-            180 - particleCoordinates[i].particleCoordinateArray[j].angle;
+          // Mirror position, opacity and velocity (heading reflected across the
+          // vertical axis so the streak points the other way).
+          const m = mirrorArr[j];
+          m.x = 2 * centerX - p.x;
+          m.y = p.y;
+          m.opacity = p.opacity;
+          m.speed = p.speed;
+          m.angle = 180 - p.angle;
         }
       }
     };
@@ -654,7 +747,7 @@ export default function App() {
     // Isolate one colour channel of the assembled frame, then blit it into the
     // aberration buffer at an offset. Repeated per channel (additively) this
     // splits the whole image into RGB fringes — chromatic aberration. Offsets
-    // are in chunky-pixel units.
+    // are in device pixels.
     const splitChannel = (colour: string, dx: number, dy: number) => {
       const w = frameCanvas.width;
       const h = frameCanvas.height;
@@ -669,14 +762,6 @@ export default function App() {
       chScratchCtx.globalCompositeOperation = "destination-in";
       chScratchCtx.drawImage(frameCanvas, 0, 0);
       abCtx.drawImage(chScratchCanvas, dx, dy);
-    };
-
-    // Thin dark lines aligned to the pixel grid, so the chunky pixels read as
-    // the gaps between LEDs on an arcade display.
-    const renderScanlines = () => {
-      if (!ctx) return;
-      ctx.globalCompositeOperation = "source-over";
-      ctx.drawImage(scanlineCanvas, 0, 0);
     };
 
     const draw = (timestamp: number) => {
@@ -699,47 +784,45 @@ export default function App() {
       sceneCtx.clearRect(0, 0, canvas.width, canvas.height);
       renderStars();
       renderShockwaves();
+      renderGodRays();
       renderParticles();
       renderRing(ringCoordinates);
+      renderCenterDisc();
       renderCore();
 
-      // --- Composite into the low-res pixel buffers ---
-      const pw = pixelCanvas.width;
-      const ph = pixelCanvas.height;
+      // --- Full-resolution post-processing ---
+      const w = canvas.width;
+      const h = canvas.height;
 
-      // 1) Assemble the frame (sharp scene + bloom) at pixel resolution.
+      // 1) Build the glow source. The bloom itself is NOT mixed in here — it's
+      // applied fresh at the very end (step 4) so it can't accumulate in the
+      // motion-trail buffer, which is what made it flicker.
+      glowCtx.imageSmoothingEnabled = true;
+      glowCtx.imageSmoothingQuality = "high";
       glowCtx.globalCompositeOperation = "source-over";
       glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
       glowCtx.drawImage(sceneCanvas, 0, 0, glowCanvas.width, glowCanvas.height);
 
+      // The frame fed to the aberration + trail is the SHARP scene only.
       frameCtx.imageSmoothingEnabled = true;
+      frameCtx.imageSmoothingQuality = "high";
       frameCtx.globalCompositeOperation = "source-over";
       frameCtx.globalAlpha = 1;
-      frameCtx.clearRect(0, 0, pw, ph);
-      frameCtx.drawImage(sceneCanvas, 0, 0, pw, ph); // sharp, downsampled
-      frameCtx.globalCompositeOperation = "lighter";
-      frameCtx.globalAlpha = 0.55;
-      frameCtx.drawImage(
-        glowCanvas,
-        0,
-        0,
-        glowCanvas.width,
-        glowCanvas.height,
-        0,
-        0,
-        pw,
-        ph
-      ); // bloom
-      frameCtx.globalAlpha = 1;
-      frameCtx.globalCompositeOperation = "source-over";
+      frameCtx.clearRect(0, 0, w, h);
+      frameCtx.drawImage(sceneCanvas, 0, 0);
 
       // 2) Chromatic aberration: split the WHOLE frame into RGB channels and
       // recombine them offset. Separation is driven by the bass-hit envelope;
       // when it's negligible we just copy the frame across.
       abCtx.globalAlpha = 1;
-      abCtx.clearRect(0, 0, pw, ph);
-      const sep = Math.min(8, aberration); // separation in chunky pixels
-      if (sep < 0.4) {
+      abCtx.clearRect(0, 0, w, h);
+      // Total separation = sustained baseline (present throughout playback) +
+      // the sharp per-hit spike on top, clamped so it never goes absurd.
+      const sep = Math.min(
+        radius * 0.16,
+        aberrationBase * radius * 0.07 + aberration
+      ); // separation in device px
+      if (sep < 0.5) {
         abCtx.globalCompositeOperation = "source-over";
         abCtx.drawImage(frameCanvas, 0, 0);
       } else {
@@ -750,22 +833,51 @@ export default function App() {
         abCtx.globalCompositeOperation = "source-over";
       }
 
-      // 3) Motion-trail fade (in pixel space, so trails stay chunky too), then
-      // lay the aberrated frame over it. source-over avoids additive blowout.
-      pixelCtx.imageSmoothingEnabled = true;
-      pixelCtx.globalCompositeOperation = "source-over";
-      pixelCtx.globalAlpha = 1;
-      pixelCtx.fillStyle = "hsl(0 0% 0% / 0.35)";
-      pixelCtx.fillRect(0, 0, pw, ph);
-      pixelCtx.drawImage(abCanvas, 0, 0);
+      // 3) Motion-trail fade, then lay the aberrated frame over the history.
+      // source-over avoids additive blowout.
+      trailCtx.imageSmoothingEnabled = true;
+      trailCtx.globalCompositeOperation = "source-over";
+      trailCtx.globalAlpha = 1;
+      trailCtx.fillStyle = "hsl(0 0% 0% / 0.35)";
+      trailCtx.fillRect(0, 0, w, h);
+      trailCtx.drawImage(abCanvas, 0, 0);
 
-      // --- Upscale to the screen with NO smoothing → chunky arcade pixels ---
-      ctx.imageSmoothingEnabled = false;
+      // 4) Blit to the screen with a bass-driven zoom-push centred on the core.
+      // The scale is always >= 1, so zooming in never exposes the canvas edges.
+      const zoom = 1 + Math.min(0.04, punchZoom);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.globalCompositeOperation = "source-over";
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(pixelCanvas, 0, 0, pw, ph, 0, 0, canvas.width, canvas.height);
-
-      renderScanlines();
+      ctx.globalAlpha = 1;
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.translate(w / 2, h / 2);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-w / 2, -h / 2);
+      ctx.drawImage(trailCanvas, 0, 0);
+      // Bloom, applied FRESH here on top of the trail (not mixed into it), so it
+      // reflects only the current frame and never accumulates. That accumulation
+      // in the motion trail was what made the glow overshoot and flicker as the
+      // blob's ring changed size with the music. Gaussian-blurred so the halo is
+      // smooth rather than stair-stepped from the low-res upscale.
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = 0.5;
+      ctx.filter = `blur(${Math.max(2, Math.round(radius * 0.06))}px)`;
+      ctx.drawImage(
+        glowCanvas,
+        0,
+        0,
+        glowCanvas.width,
+        glowCanvas.height,
+        0,
+        0,
+        w,
+        h
+      );
+      ctx.filter = "none";
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.restore();
     };
 
     requestAnimationFrame(draw);
@@ -777,15 +889,16 @@ export default function App() {
   }, []);
 
   const handlePlay = () => {
-    // The play button is a user gesture, which iOS requires before the context
-    // is allowed to start producing sound.
-    getAudioContext().resume();
+    // The play button is the user gesture that lets the context start, and what
+    // resumes it after a pause.
+    if (audioContextRef.current?.state === "suspended") {
+      audioContextRef.current.resume();
+    }
   };
 
   const handlePause = () => {
-    // Suspend the graph the instant playback stops so its buffered tail can't
-    // keep getting re-rendered by the destination — that drain is the iOS
-    // "last fragment loops a few times before it actually stops" glitch.
+    // Suspend the context on pause so its buffered tail can't keep getting
+    // re-rendered by the destination — that drain is the looping-fragment glitch.
     audioContextRef.current?.suspend();
   };
 
