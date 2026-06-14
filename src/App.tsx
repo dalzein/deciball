@@ -99,8 +99,9 @@ export default function App() {
     const sceneCtx = sceneCanvas.getContext("2d")!;
 
     // Tiny buffer holding a heavily downscaled copy of the scene, blitted back
-    // upscaled to produce a cheap blur/bloom.
-    const glowScale = 0.25;
+    // upscaled to produce a cheap blur/bloom. The downscale factor is set per
+    // resize by applyQualityForWidth (narrow screens blur at lower resolution).
+    let glowScale = 0.25;
     const glowCanvas = document.createElement("canvas");
     const glowCtx = glowCanvas.getContext("2d")!;
 
@@ -167,9 +168,40 @@ export default function App() {
       }
     };
 
-    for (let angle = 90; angle < 450; angle += 1) {
-      particleCoordinates.push({ particleCoordinateArray: [], angle });
-    }
+    // Visual quality tapers with viewport width (recomputed per resize) to keep
+    // mobile cheap: fewer particle slots — each is an angular emitter that can
+    // spawn a comet per loud frame — and a smaller bloom buffer, the heaviest
+    // pass yet barely noticeable on a small screen.
+    const REF_FULL_WIDTH = 1100; // at/above this width: full quality
+    const REF_MIN_WIDTH = 380; // at/below this width: lowest quality
+    const SLOTS_FULL = 360;
+    const SLOTS_MIN = 110;
+    const GLOW_SCALE_FULL = 0.25;
+    const GLOW_SCALE_MIN = 0.12;
+    let particleSlotCount = 0;
+
+    const applyQualityForWidth = (width: number) => {
+      const t = Math.max(
+        0,
+        Math.min(
+          1,
+          (width - REF_MIN_WIDTH) / (REF_FULL_WIDTH - REF_MIN_WIDTH)
+        )
+      );
+      glowScale = GLOW_SCALE_MIN + t * (GLOW_SCALE_FULL - GLOW_SCALE_MIN);
+
+      const slotCount = Math.round(SLOTS_MIN + t * (SLOTS_FULL - SLOTS_MIN));
+      // Only rebuild slots when the count changes — resize fires continuously
+      // while dragging, and a rebuild drops in-flight particles.
+      if (slotCount !== particleSlotCount) {
+        particleSlotCount = slotCount;
+        const angleStep = 360 / slotCount;
+        particleCoordinates.length = 0;
+        for (let angle = 90; angle < 450; angle += angleStep) {
+          particleCoordinates.push({ particleCoordinateArray: [], angle });
+        }
+      }
+    };
 
     for (let angle = 90; angle < 450; angle += 360 / totalRingPoints) {
       ringCoordinates.push({
@@ -183,6 +215,8 @@ export default function App() {
     const resize = () => {
       canvas.width = canvas.clientWidth;
       canvas.height = canvas.clientHeight;
+      // Must run before the glow buffer is sized below, which reads glowScale.
+      applyQualityForWidth(canvas.width);
       sceneCanvas.width = frameCanvas.width = chScratchCanvas.width =
         abCanvas.width = trailCanvas.width = canvas.width;
       sceneCanvas.height = frameCanvas.height = chScratchCanvas.height =
@@ -193,6 +227,7 @@ export default function App() {
       seedStars();
     };
     resize();
+    window.addEventListener("resize", resize);
 
     const renderStars = () => {
       // Every star shares the same colour within a frame (only its alpha
@@ -885,6 +920,7 @@ export default function App() {
     return () => {
       // Dispose context to break animation so it doesn't continue running
       ctx = null;
+      window.removeEventListener("resize", resize);
     };
   }, []);
 
