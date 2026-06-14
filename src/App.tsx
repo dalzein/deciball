@@ -47,11 +47,31 @@ const frequencyArray = new Float32Array(totalRingPoints / 2 + binsToSkip + 1);
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioContextRef = useRef<AudioContext>(
-    new AudioContext({ sampleRate: 44100 })
-  );
+  const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+
+  // Create the AudioContext lazily, on first real use. Doing it inline in
+  // useRef(new AudioContext(...)) constructs a throwaway context on every
+  // render, and iOS hard-caps the number of live contexts.
+  //
+  // iOS audio hardware runs at 48kHz. Forcing a 44.1kHz context makes Safari
+  // resample the output to the hardware clock in realtime; underruns in that
+  // resampler are exactly what cause the random pitch wobble and the "last
+  // fragment loops a few times on pause" stutter. Letting iOS adopt its native
+  // rate removes that output resampler. Desktop keeps 44.1kHz so the tuned
+  // frequency -> ring-point mapping (bin widths) stays identical there.
+  const getAudioContext = () => {
+    if (!audioContextRef.current) {
+      const isIOS =
+        /iP(hone|ad|od)/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      audioContextRef.current = new AudioContext(
+        isIOS ? {} : { sampleRate: 44100 }
+      );
+    }
+    return audioContextRef.current;
+  };
 
   useEffect(() => {
     const audioElement = audioRef.current;
@@ -59,31 +79,15 @@ export default function App() {
     if (!audioElement) return;
 
     if (!audioSourceRef.current) {
+      const audioContext = getAudioContext();
       audioSourceRef.current =
-        audioContextRef.current.createMediaElementSource(audioElement);
+        audioContext.createMediaElementSource(audioElement);
 
-      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current = audioContext.createAnalyser();
       analyserRef.current.fftSize = 8192;
       audioSourceRef.current.connect(analyserRef.current);
-      analyserRef.current.connect(audioContextRef.current.destination);
+      analyserRef.current.connect(audioContext.destination);
     }
-  }, []);
-
-  // User interaction is needed before we can resume the audio context
-  useEffect(() => {
-    const resumeAudioContext = () => {
-      if (audioContextRef.current?.state === "suspended") {
-        audioContextRef.current.resume();
-      }
-    };
-
-    document.addEventListener("touchend", resumeAudioContext);
-    document.addEventListener("click", resumeAudioContext);
-
-    return () => {
-      document.removeEventListener("touchend", resumeAudioContext);
-      document.removeEventListener("click", resumeAudioContext);
-    };
   }, []);
 
   useEffect(() => {
@@ -118,6 +122,13 @@ export default function App() {
     const chScratchCtx = chScratchCanvas.getContext("2d")!;
     const abCtx = abCanvas.getContext("2d")!;
     const pixelCtx = pixelCanvas.getContext("2d")!;
+
+    // The scanline overlay never changes between frames (it only depends on the
+    // viewport size and the constant pixelSize), so we render it once into this
+    // buffer on resize and blit it in a single drawImage per frame instead of
+    // looping hundreds of fillRects every frame.
+    const scanlineCanvas = document.createElement("canvas");
+    const scanlineCtx = scanlineCanvas.getContext("2d")!;
 
     const ringCoordinates: RingPoint[] = [];
     const particleCoordinates: ParticleCoordinates[] = [];
@@ -185,12 +196,29 @@ export default function App() {
         pixelCanvas.height = ph;
       radius = Math.min(canvas.width, canvas.height) / 4;
       seedStars();
+      buildScanlines();
+    };
+
+    // Pre-render the static scanline overlay at full screen resolution.
+    const buildScanlines = () => {
+      scanlineCanvas.width = canvas.width;
+      scanlineCanvas.height = canvas.height;
+      scanlineCtx.clearRect(0, 0, canvas.width, canvas.height);
+      scanlineCtx.fillStyle = "hsl(0 0% 0% / 0.22)";
+      const lineH = Math.max(1, Math.round(pixelSize / 5));
+      for (let y = pixelSize - lineH; y < canvas.height; y += pixelSize) {
+        scanlineCtx.fillRect(0, y, canvas.width, lineH);
+      }
     };
     resize();
 
     const renderStars = () => {
+      // Every star shares the same colour within a frame (only its alpha
+      // flickers), so set the fillStyle once and drive the per-star flicker
+      // through globalAlpha — avoids building an hsl() string per star/frame.
+      sceneCtx.fillStyle = `hsl(${hue + 30} 40% 90%)`;
       for (const star of stars) {
-        const flicker =
+        sceneCtx.globalAlpha =
           star.baseOpacity *
           (0.6 + 0.4 * Math.sin(time * 0.002 + star.twinkle));
         sceneCtx.beginPath();
@@ -201,29 +229,59 @@ export default function App() {
           0,
           2 * Math.PI
         );
-        sceneCtx.fillStyle = `hsl(${hue + 30} 40% 90% / ${flicker})`;
         sceneCtx.fill();
       }
+      sceneCtx.globalAlpha = 1;
     };
 
-    // Draw the flying particles as comet streaks: a gradient tapering from a
-    // transparent tail to a bright head, its length following the particle's
-    // velocity (so they stretch out as the bass speeds them up). Their soft
-    // glow comes from the bloom pass rather than a per-particle shadowBlur.
+    // Comet sprite atlas. The streaks used to be built from a per-particle
+    // linear gradient every frame — an object allocation plus two colour-string
+    // parses per particle, and there can be hundreds of particles on a bass
+    // hit. Instead we pre-render one streak texture per hue bucket a single
+    // time, then just translate/rotate/scale/drawImage them. Each sprite is a
+    // round-capped line filled with a tail(transparent)→head(opaque) gradient
+    // in a normalised 0→length space; per-particle opacity is applied with
+    // globalAlpha at draw time. Hue is quantised to `cometBuckets` steps.
+    const cometBuckets = 36; // 360 / 36 = 10° hue resolution
+    const cometSpriteLen = 64; // sprite length in px (mapped to streak length)
+    const cometCoreW = 12; // sprite line thickness (mapped to streak width)
+    const cometSpriteH = cometCoreW;
+    const cometSprites: HTMLCanvasElement[] = [];
+    for (let b = 0; b < cometBuckets; b++) {
+      const h = (b * 360) / cometBuckets;
+      const sprite = document.createElement("canvas");
+      sprite.width = cometSpriteLen;
+      sprite.height = cometSpriteH;
+      const sctx = sprite.getContext("2d")!;
+      const grad = sctx.createLinearGradient(0, 0, cometSpriteLen, 0);
+      grad.addColorStop(0, `hsl(${h} 100% 78% / 0)`);
+      grad.addColorStop(1, `hsl(${h} 100% 78% / 1)`);
+      sctx.strokeStyle = grad;
+      sctx.lineWidth = cometCoreW;
+      sctx.lineCap = "round";
+      sctx.beginPath();
+      sctx.moveTo(cometCoreW / 2, cometSpriteH / 2);
+      sctx.lineTo(cometSpriteLen - cometCoreW / 2, cometSpriteH / 2);
+      sctx.stroke();
+      cometSprites.push(sprite);
+    }
+
+    // Draw the flying particles as comet streaks whose length follows the
+    // particle's velocity (so they stretch out as the bass speeds them up).
+    // Their soft glow comes from the bloom pass rather than a per-particle
+    // shadowBlur.
     const trailFrames = 6; // how many frames of motion the tail spans
     const renderParticles = () => {
-      sceneCtx.lineCap = "round";
       particleCoordinates.forEach((position) => {
         position.particleCoordinateArray.forEach((particle) => {
           const vx =
             Math.cos((-particle.angle * Math.PI) / 180) * particle.speed;
           const vy =
             Math.sin((-particle.angle * Math.PI) / 180) * particle.speed;
-          const tailX = particle.x - vx * trailFrames;
-          const tailY = particle.y - vy * trailFrames;
+          const streakLen = Math.hypot(vx, vy) * trailFrames;
 
           // Too slow to streak meaningfully → just a dot
-          if (Math.hypot(vx, vy) * trailFrames < particle.size) {
+          if (streakLen < particle.size) {
             sceneCtx.beginPath();
             sceneCtx.arc(particle.x, particle.y, particle.size, 0, 2 * Math.PI);
             sceneCtx.fillStyle = `hsl(${particle.hue} 100% 78% / ${particle.opacity})`;
@@ -231,20 +289,27 @@ export default function App() {
             return;
           }
 
-          const grad = sceneCtx.createLinearGradient(
-            tailX,
-            tailY,
-            particle.x,
-            particle.y
+          const tailX = particle.x - vx * trailFrames;
+          const tailY = particle.y - vy * trailFrames;
+          const bucket =
+            ((Math.round((particle.hue / 360) * cometBuckets) % cometBuckets) +
+              cometBuckets) %
+            cometBuckets;
+
+          // Place the sprite from tail (local origin) to head: rotate to the
+          // velocity direction, scale x to the streak length and y to its
+          // width. The baked gradient (0→1 alpha) times globalAlpha reproduces
+          // the old transparent-tail → opacity-head fade.
+          sceneCtx.save();
+          sceneCtx.globalAlpha = Math.max(0, Math.min(1, particle.opacity));
+          sceneCtx.translate(tailX, tailY);
+          sceneCtx.rotate(Math.atan2(vy, vx));
+          sceneCtx.scale(
+            streakLen / cometSpriteLen,
+            (particle.size * 1.4) / cometCoreW
           );
-          grad.addColorStop(0, `hsl(${particle.hue} 100% 75% / 0)`);
-          grad.addColorStop(1, `hsl(${particle.hue} 100% 78% / ${particle.opacity})`);
-          sceneCtx.strokeStyle = grad;
-          sceneCtx.lineWidth = particle.size * 1.4;
-          sceneCtx.beginPath();
-          sceneCtx.moveTo(tailX, tailY);
-          sceneCtx.lineTo(particle.x, particle.y);
-          sceneCtx.stroke();
+          sceneCtx.drawImage(cometSprites[bucket], 0, -cometSpriteH / 2);
+          sceneCtx.restore();
         });
       });
     };
@@ -427,11 +492,13 @@ export default function App() {
         }
       }
 
-      // The "loudness" will be the average distanceFactor value of the ring coordinates
-      currentLoudness =
-        ringCoordinates
-          .map((x) => x.distanceFactor)
-          .reduce((a, b) => a + b, 0) / ringCoordinates.length;
+      // The "loudness" will be the average distanceFactor value of the ring
+      // coordinates (plain loop to avoid allocating an array every frame).
+      let loudnessSum = 0;
+      for (let k = 0; k < ringCoordinates.length; k++) {
+        loudnessSum += ringCoordinates[k].distanceFactor;
+      }
+      currentLoudness = loudnessSum / ringCoordinates.length;
 
       // --- Derived visual signals (do not affect the extraction above) ---
       // Slow floor we compare against, then the transient above that floor.
@@ -609,11 +676,7 @@ export default function App() {
     const renderScanlines = () => {
       if (!ctx) return;
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "hsl(0 0% 0% / 0.22)";
-      const lineH = Math.max(1, Math.round(pixelSize / 5));
-      for (let y = pixelSize - lineH; y < canvas.height; y += pixelSize) {
-        ctx.fillRect(0, y, canvas.width, lineH);
-      }
+      ctx.drawImage(scanlineCanvas, 0, 0);
     };
 
     const draw = (timestamp: number) => {
@@ -714,9 +777,16 @@ export default function App() {
   }, []);
 
   const handlePlay = () => {
-    if (audioContextRef.current?.state === "suspended") {
-      audioContextRef.current.resume();
-    }
+    // The play button is a user gesture, which iOS requires before the context
+    // is allowed to start producing sound.
+    getAudioContext().resume();
+  };
+
+  const handlePause = () => {
+    // Suspend the graph the instant playback stops so its buffered tail can't
+    // keep getting re-rendered by the destination — that drain is the iOS
+    // "last fragment loops a few times before it actually stops" glitch.
+    audioContextRef.current?.suspend();
   };
 
   return (
@@ -728,7 +798,13 @@ export default function App() {
       ></canvas>
       <div className={styles.audioWrapper}>
         <Uploader audioRef={audioRef} />
-        <audio ref={audioRef} src={audio} controls onPlay={handlePlay}></audio>
+        <audio
+          ref={audioRef}
+          src={audio}
+          controls
+          onPlay={handlePlay}
+          onPause={handlePause}
+        ></audio>
       </div>
     </>
   );
