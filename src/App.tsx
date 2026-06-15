@@ -102,6 +102,7 @@ export default function App() {
     // upscaled to produce a cheap blur/bloom. The downscale factor is set per
     // resize by applyQualityForWidth (narrow screens blur at lower resolution).
     let glowScale = 0.25;
+    let bloomEnabled = true; // gated off on narrow screens (see BLOOM_MIN_WIDTH)
     const glowCanvas = document.createElement("canvas");
     const glowCtx = glowCanvas.getContext("2d")!;
 
@@ -170,14 +171,16 @@ export default function App() {
 
     // Visual quality tapers with viewport width (recomputed per resize) to keep
     // mobile cheap: fewer particle slots — each is an angular emitter that can
-    // spawn a comet per loud frame — and a smaller bloom buffer, the heaviest
-    // pass yet barely noticeable on a small screen.
+    // spawn a comet per loud frame. The bloom, by contrast, is the heaviest pass
+    // and barely noticeable on a small screen, so rather than running it at a
+    // reduced resolution it's switched off entirely below BLOOM_MIN_WIDTH and
+    // kept at full quality above it (no in-between scaling).
     const REF_FULL_WIDTH = 1100; // at/above this width: full quality
     const REF_MIN_WIDTH = 380; // at/below this width: lowest quality
     const SLOTS_FULL = 360;
     const SLOTS_MIN = 110;
-    const GLOW_SCALE_FULL = 0.25;
-    const GLOW_SCALE_MIN = 0.12;
+    const GLOW_SCALE = 0.25; // fixed bloom buffer scale whenever bloom is on
+    const BLOOM_MIN_WIDTH = 640; // below this width the bloom pass is disabled
     let particleSlotCount = 0;
 
     const applyQualityForWidth = (width: number) => {
@@ -188,7 +191,8 @@ export default function App() {
           (width - REF_MIN_WIDTH) / (REF_FULL_WIDTH - REF_MIN_WIDTH)
         )
       );
-      glowScale = GLOW_SCALE_MIN + t * (GLOW_SCALE_FULL - GLOW_SCALE_MIN);
+      bloomEnabled = width >= BLOOM_MIN_WIDTH;
+      glowScale = GLOW_SCALE;
 
       const slotCount = Math.round(SLOTS_MIN + t * (SLOTS_FULL - SLOTS_MIN));
       // Only rebuild slots when the count changes — resize fires continuously
@@ -831,12 +835,15 @@ export default function App() {
 
       // 1) Build the glow source. The bloom itself is NOT mixed in here — it's
       // applied fresh at the very end (step 4) so it can't accumulate in the
-      // motion-trail buffer, which is what made it flicker.
-      glowCtx.imageSmoothingEnabled = true;
-      glowCtx.imageSmoothingQuality = "high";
-      glowCtx.globalCompositeOperation = "source-over";
-      glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
-      glowCtx.drawImage(sceneCanvas, 0, 0, glowCanvas.width, glowCanvas.height);
+      // motion-trail buffer, which is what made it flicker. Skipped entirely on
+      // narrow screens, where the whole bloom pass is disabled.
+      if (bloomEnabled) {
+        glowCtx.imageSmoothingEnabled = true;
+        glowCtx.imageSmoothingQuality = "high";
+        glowCtx.globalCompositeOperation = "source-over";
+        glowCtx.clearRect(0, 0, glowCanvas.width, glowCanvas.height);
+        glowCtx.drawImage(sceneCanvas, 0, 0, glowCanvas.width, glowCanvas.height);
+      }
 
       // The frame fed to the aberration + trail is the SHARP scene only.
       frameCtx.imageSmoothingEnabled = true;
@@ -894,24 +901,28 @@ export default function App() {
       // reflects only the current frame and never accumulates. That accumulation
       // in the motion trail was what made the glow overshoot and flicker as the
       // blob's ring changed size with the music. Gaussian-blurred so the halo is
-      // smooth rather than stair-stepped from the low-res upscale.
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = 0.5;
-      ctx.filter = `blur(${Math.max(2, Math.round(radius * 0.06))}px)`;
-      ctx.drawImage(
-        glowCanvas,
-        0,
-        0,
-        glowCanvas.width,
-        glowCanvas.height,
-        0,
-        0,
-        w,
-        h
-      );
-      ctx.filter = "none";
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
+      // smooth rather than stair-stepped from the low-res upscale. Disabled
+      // wholesale on narrow screens — it's the most expensive pass and the least
+      // missed at mobile sizes.
+      if (bloomEnabled) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = 0.5;
+        ctx.filter = `blur(${Math.max(2, Math.round(radius * 0.06))}px)`;
+        ctx.drawImage(
+          glowCanvas,
+          0,
+          0,
+          glowCanvas.width,
+          glowCanvas.height,
+          0,
+          0,
+          w,
+          h
+        );
+        ctx.filter = "none";
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+      }
       ctx.restore();
     };
 
