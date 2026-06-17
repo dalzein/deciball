@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import styles from "./App.module.css";
 import audio from "./assets/royalty.mp3";
 import Uploader from "./components/Uploader/Uploader";
+import GitHubLink from "./components/GitHubLink/GitHubLink";
 
 type RingPoint = {
   angle: number;
@@ -956,6 +957,7 @@ export default function App() {
         width={window.innerWidth}
         height={window.innerHeight}
       ></canvas>
+      <GitHubLink />
       <div className={styles.audioWrapper}>
         <Uploader audioRef={audioRef} />
         <audio

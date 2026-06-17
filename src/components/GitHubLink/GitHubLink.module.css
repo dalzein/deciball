@@ -1,0 +1,24 @@
+.link {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground);
+  opacity: 0.35;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.link:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+
+.link:focus-visible {
+  opacity: 1;
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+  border-radius: 50%;
+}
